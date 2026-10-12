@@ -1,0 +1,57 @@
+# ============================================================
+# PARTE 1: OS CAIXAS (Deployment)
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-catalogo
+spec:
+  # ATENÇÃO: sem o campo "replicas" de propósito.
+  # Quem decide quantos caixas (pods) existem agora é o gerente (HPA).
+  # Se "replicas" ficar aqui, todo "kubectl apply" (ou pipeline de CI/CD)
+  # volta o número para o valor fixo e briga com o HPA.
+  selector:
+    matchLabels:
+      app: api-catalogo              # o Deployment cuida dos pods com esta etiqueta
+  template:
+    metadata:
+      labels:
+        app: api-catalogo            # etiqueta colocada em cada caixa (pod) criado
+    spec:
+      containers:
+        - name: catalogo
+          # Imagem oficial de exemplo do Kubernetes: cada acesso faz uma conta
+          # pesada, ou seja, gasta CPU de propósito (ótimo para ver o HPA agir)
+          image: registry.k8s.io/hpa-example
+          ports:
+            - containerPort: 80      # porta onde a aplicação escuta dentro do container
+          resources:
+            # RESERVA (requests): a força garantida de cada caixa (pod).
+            # - O arrumador (Scheduler) usa para decidir em qual sala (node) o pod cabe.
+            # - O gerente (HPA) usa como base para calcular a porcentagem de esforço.
+            # SEM requests de CPU, o HPA mostra <unknown> e não funciona.
+            requests:
+              cpu: 200m              # 200 milicores = 1/5 de um núcleo de CPU
+              memory: 128Mi          # 128 megabytes de memória garantidos
+            # TETO (limits): o máximo que o caixa pode usar, emprestando o que
+            # estiver ocioso na sala (node).
+            limits:
+              cpu: 500m              # passou disso, o pod é freado (throttling), fica lento
+              memory: 128Mi          # igual ao requests: prática de produção para memória,
+                                     # evita o pod viver de memória emprestada e ser o
+                                     # primeiro a morrer (OOMKilled) se a sala apertar
+---
+# ============================================================
+# PARTE 2: O ORGANIZADOR DA FILA (Service)
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-catalogo                 # nome que os clientes (requisições) usam para chegar
+spec:
+  selector:
+    app: api-catalogo                # aponta para os caixas (pods) com esta etiqueta,
+                                     # inclusive os novos que o HPA criar
+  ports:
+    - port: 80                       # porta do Service
+      targetPort: 80                 # porta do container

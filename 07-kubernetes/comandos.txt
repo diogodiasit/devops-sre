@@ -146,3 +146,43 @@ kubectl apply -f cozinheiro.yaml        # liveness probe: o app "trava" apagando
 kubectl describe pod -l app=cozinheiro  # Events mostra "Liveness probe failed" e o reinicio
 kubectl scale deployment cozinheiro --replicas=0   # pausa o teste sem apagar o Deployment
 kubectl get pod -l app=garcom -o jsonpath='{.items[0].spec.containers[*].name}'; echo   # nomes dos containers do Pod
+
+# ===== HPA (Horizontal Pod Autoscaler) =====
+
+# --- Laboratório (minikube) ---
+minikube addons enable metrics-server      # liga o contador de CPU/memória (no AKS já vem pronto)
+
+# --- Consumo ---
+kubectl top pods -A                        # consumo de todos os pods, em todos os namespaces
+kubectl top pods -l app=api-catalogo       # consumo de cada pod de uma aplicação
+watch -n 5 kubectl top pods -l app=...     # mesmo comando, atualizando a cada 5 segundos
+
+# --- HPA ---
+kubectl autoscale deployment api-catalogo --name=escalador-catalogo --cpu-percent=50 --min=2 --max=8
+                                           # cria HPA por comando (não configura o behavior)
+kubectl get hpa escalador-catalogo         # estado: TARGETS (uso/meta) e REPLICAS
+kubectl get hpa escalador-catalogo --watch # acompanha ao vivo
+kubectl describe hpa escalador-catalogo    # ficha completa: Metrics, Conditions, Events
+
+# --- Gerador de carga ---
+kubectl run gerador-carga --rm -it --image=busybox:1.36 --restart=Never -- /bin/sh -c "while sleep 0.01; do wget -q -O- http://svc-catalogo; done"
+
+# --- Utilitários vistos ---
+kubectl get deploy,svc,hpa,pods -o name          # lista no formato tipo/nome
+kubectl rollout status deployment/api-catalogo   # acompanha troca gradual (rolling update)
+kubectl get rs                                   # ReplicaSets (moldes atual e antigos)
+kubectl apply -f arquivo.yaml --dry-run=client   # valida o YAML sem aplicar
+kubectl create deployment x --image=nginx --dry-run=client -o yaml   # gera esqueleto de YAML
+kubectl delete -f arquivo.yaml                   # apaga do cluster o que o arquivo descreve
+kubectl delete deployment app1 app2              # apaga vários pelo nome
+kubectl delete configmap/a secret/b ingress/c    # apaga tipos diferentes (tipo/nome)
+
+# --- Debug de pod ---
+kubectl describe pod NOME                  # Events: problemas ao redor do pod (imagem, vaga, OOM, probe)
+kubectl logs NOME                          # o que a aplicação escreveu
+kubectl logs NOME --previous               # log da execução anterior (pod que reiniciou)
+
+# --- nano ---
+nano -l arquivo.yaml                       # abre com número das linhas
+# Alt+U desfaz · Alt+E refaz · Ctrl+_ vai para a linha · Alt+P mostra espaços/tabs · Alt+/ vai para o fim
+# ~/.nanorc: set linenumbers / autoindent / tabstospaces / tabsize 2 / include "/usr/share/nano/*.nanorc"
