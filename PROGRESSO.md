@@ -50,3 +50,9 @@
 - Commitar no GitHub: +10 XP
 - Errar e tentar de novo: +10 XP (errar também conta, porque é tentativa)
 - Projetos extras/divertidos não contam XP — são só diversão, separados do progresso oficial
+
+### HPA (Horizontal Pod Autoscaler) ✅
+- Lógica: HPA decide quantos pods pela média de CPU em % do `requests`; metrics-server mede; `limits` é o teto
+- Prática: escala de 2 → 6 pods com gerador de carga e volta para 2 após a janela de 5 min
+- Debug: `describe hpa` (Metrics, Conditions, Events); bug de `requests` ausente → `<unknown>`
+- Extras vistos: Cluster Autoscaler, overprovisioning, rolling update, Events x logs, limpeza do cluster

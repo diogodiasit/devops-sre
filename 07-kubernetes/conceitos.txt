@@ -188,3 +188,52 @@
 - Comando que MUDA o Deployment (rollout restart, scale) age em todos os Pods
 - exec e logs com deploy/nome escolhem UM Pod, sem voce controlar qual;
   para um Pod especifico, usar o nome exato dele
+
+# ===== HPA (Horizontal Pod Autoscaler) =====
+
+ANALOGIA: supermercado
+- Gerente (HPA): decide quantos caixas (pods) ficam abertos
+- Prancheta (metrics-server): mede o esforço real (CPU) de cada caixa e informa o HPA
+- Organizador da fila (Service): distribui as requisições entre os pods prontos
+- Arrumador (Scheduler): decide em qual node cada pod roda, olhando o requests
+- Construtor (Cluster Autoscaler): cria/remove nodes quando há pods Pending (no AKS, opção do node pool)
+- Fantasmas (pods placeholder / overprovisioning): guardam vaga; expulsos no pico, avisam o Cluster Autoscaler mais cedo
+
+RECURSOS DE CADA POD (no Deployment)
+- requests (reserva): força GARANTIDA. Base do cálculo do HPA e do Scheduler. Sem ele → HPA <unknown>
+- limits (teto): máximo que o pod pode usar emprestando força ociosa do node. CPU no teto → fica lento (throttling)
+- Empréstimo: só da força ociosa; quando o dono da reserva precisa, recebe na hora (o Linux reajusta sozinho)
+- Pegadinha: sem requests mas com limits → o Kubernetes copia o limits para o requests
+- Memória: não dá para devolver aos poucos → falta = OOMKilled. Prática: limits de memória = requests
+- Sem requests e sem limits → pod BestEffort (primeiro a ser expulso)
+- No teto de CPU o pod não recusa requisições: fica lento. A fila fica no próprio pod (memória), não no Service
+
+REGRAS DO HPA
+- Meta (averageUtilization): % da reserva em que cada pod deve trabalhar (ex.: 50%). É META, não gatilho
+- minReplicas / maxReplicas: mínimo e máximo de pods (mínimo 2 = alta disponibilidade)
+- Decide pela MÉDIA dos pods → um pod sobrecarregado pode se esconder na média
+- Sobe rápido; desce devagar (stabilizationWindowSeconds = 300 / 5 min) → evita flapping
+- Padrão de subida: a cada 15s, dobra ou soma 4 pods (o maior) → por isso 2 → 6
+- Metrics-server fora do ar → HPA congela no último número (não sobe nem desce)
+- Com HPA, REMOVER o campo replicas do Deployment (senão o apply/pipeline briga com o HPA)
+- HPA olha CPU (esforço), não quantidade de requisições. Requisições/s = métricas customizadas (Prometheus, KEDA)
+
+CAMADAS DE ESCALA
+- HPA: mais pods · VPA: pods maiores · Cluster Autoscaler: mais nodes
+- Pod sobe em segundos; node (VM) em minutos
+- Economia real na nuvem: paga-se por VM (node), não por pod → só economiza quando o node é desligado
+
+DEBUG
+- describe hpa: Metrics (esforço), Conditions (ScalingActive = enxerga? AbleToScale = pode agir?), Events (decisões e erros)
+- HPA <unknown>: 1) metrics-server fora; 2) falta requests de CPU ("missing request for cpu")
+- Events x logs: Events = o que o Kubernetes registra sobre o objeto (temporários). Logs = o que a aplicação escreve
+- Pod não chega a rodar → describe (Events). Pod roda e falha → logs
+- ReplicaSet: DESIRED (deveria ter) / CURRENT (existe) / READY (pronto). READY menor = pod com problema
+
+YAML
+- name = identidade única (CPF) · labels = etiqueta de grupo (camiseta) · selector = busca pela etiqueta
+- Filtro -l só encontra objetos que TÊM a label no próprio metadata (selector não conta)
+- Chaves fixas do Kubernetes (name, labels, image...) x chaves inventadas (dentro de labels/selector)
+- Irmãos na mesma coluna · só espaços, nunca Tab · hífen = item de lista
+- apply -f constrói, delete -f desmonta: o arquivo é a planta (infraestrutura como código)
+- Rolling update: troca gradual dos pods sem derrubar o sistema; ReplicaSets antigos ficam com 0 para rollback
