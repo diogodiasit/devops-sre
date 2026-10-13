@@ -237,3 +237,52 @@ YAML
 - Irmãos na mesma coluna · só espaços, nunca Tab · hífen = item de lista
 - apply -f constrói, delete -f desmonta: o arquivo é a planta (infraestrutura como código)
 - Rolling update: troca gradual dos pods sem derrubar o sistema; ReplicaSets antigos ficam com 0 para rollback
+
+=== VOLUMES PERSISTENTES ===
+
+PROBLEMA
+- Disco de dentro do container morre junto com o pod.
+- Banco de dados e arquivos importantes precisam de disco fora do pod.
+
+AS PEÇAS
+- PV (PersistentVolume): o disco real registrado no cluster. Criado
+  automaticamente. Tem ID único, tamanho, modo de acesso e política.
+- PVC (PersistentVolumeClaim): o PEDIDO de disco. É o que o dev escreve
+  (tamanho, tipo, modo de acesso). Tem nome fixo escolhido por mim.
+- StorageClass: define o tipo de disco entregue e quem o cria
+  (provisionamento dinâmico).
+- Driver CSI: programa no cluster que fala com a nuvem (Azure) e cria o disco.
+
+FLUXO
+1. Escrevo o PVC  2. CSI pede o disco à nuvem  3. Nuvem cria o disco
+4. Kubernetes cria o PV  5. PVC liga ao PV (Bound)  6. Pod usa o PVC pelo nome
+
+REGRAS
+- O pod aponta para o PVC, nunca para o PV. O mesmo YAML roda em qualquer
+  cluster (teste, homologação, produção), cada um com o seu disco.
+- 1 PVC = 1 PV. Cada pedido cria um disco próprio.
+- PVC: tamanho só aumenta (se a StorageClass permitir). Nome, StorageClass
+  e modo de acesso não mudam. Trocar o nome = disco novo e vazio.
+- PV é do cluster. PVC é do namespace.
+- Modos de acesso: ReadWriteOnce (1 node), ReadWriteMany (vários nodes),
+  ReadOnlyMany. Azure Disk = RWO.
+- reclaimPolicy: Delete apaga o disco junto com o PVC. Retain mantém.
+  Em produção com dado importante, usar Retain.
+- O PVC não libera enquanto um pod o usa: fica Terminating.
+
+BACKUP
+- Disco persistente NÃO é backup.
+- Snapshot (VolumeSnapshot) = foto do disco. Restaura criando PVC novo.
+- Banco: backup lógico (dump) guardado fora do disco.
+- Azure Backup para AKS e Velero automatizam.
+- Responsabilidade compartilhada: a nuvem dá a ferramenta, eu ligo, agendo
+  e testo a restauração.
+
+STATEFULSET (conceito)
+- Deployment: pods intercambiáveis. StatefulSet: pods com nome fixo
+  (banco-0, banco-1), subida em ordem e disco próprio para cada um.
+
+PRODUÇÃO
+- Banco em produção costuma ser gerenciado (Azure SQL, PostgreSQL Flexible).
+- Secret/ConfigMap em volume entregam config ao pod (temporário).
+  PVC guarda dado da aplicação (permanece).
