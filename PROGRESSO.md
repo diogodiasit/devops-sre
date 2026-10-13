@@ -56,3 +56,9 @@
 - Prática: escala de 2 → 6 pods com gerador de carga e volta para 2 após a janela de 5 min
 - Debug: `describe hpa` (Metrics, Conditions, Events); bug de `requests` ausente → `<unknown>`
 - Extras vistos: Cluster Autoscaler, overprovisioning, rolling update, Events x logs, limpeza do cluster
+
+### Volumes persistentes ✅
+- Lógica: pod é descartável; disco fica fora dele. PVC = pedido (nome fixo, o que o pod usa), PV = disco real registrado (criado sozinho), StorageClass = tipo de disco, driver CSI = tradutor com a nuvem
+- Prática: PVC de 1Gi no minikube → Bound; pod gravador escreve nota; pod apagado; pod leitor novo lê a mesma nota; limpeza com reclaimPolicy Delete
+- Regras: pod aponta para o PVC (nunca o PV); 1 PVC = 1 PV; tamanho só aumenta; nome não muda; Retain em produção
+- Extras vistos: snapshot e backup (disco persistente não é backup), responsabilidade compartilhada com a nuvem, StatefulSet só no conceito, custo do projeto final na Azure

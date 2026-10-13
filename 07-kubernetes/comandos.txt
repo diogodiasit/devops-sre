@@ -186,3 +186,32 @@ kubectl logs NOME --previous               # log da execução anterior (pod que
 nano -l arquivo.yaml                       # abre com número das linhas
 # Alt+U desfaz · Alt+E refaz · Ctrl+_ vai para a linha · Alt+P mostra espaços/tabs · Alt+/ vai para o fim
 # ~/.nanorc: set linenumbers / autoindent / tabstospaces / tabsize 2 / include "/usr/share/nano/*.nanorc"
+
+=== VOLUMES PERSISTENTES ===
+
+kubectl get storageclass
+  -> lista os tipos de disco que o cluster sabe entregar (setor de compras)
+
+kubectl apply -f pedido-disco-dados.yaml
+  -> cria o pedido de disco (PVC). O PV nasce sozinho
+
+kubectl get pvc
+  -> lista os pedidos. STATUS Bound = pedido ligado a um disco
+
+kubectl get pv
+  -> lista os discos registrados (PV), criados pelo cluster
+
+kubectl describe pv <nome-do-pv>
+  -> detalhes do disco: Claim (dono), Reclaim Policy, Source (onde está)
+
+kubectl describe pvc <nome-do-pvc>
+  -> detalhes do pedido: Volume ligado, Used By (pod que usa), Events
+
+kubectl exec <pod> -- cat /dados/nota.txt
+  -> lê um arquivo dentro do pod (prova que o dado sobreviveu)
+
+kubectl delete pod <pod>
+  -> apaga o pod. O PVC e o PV continuam
+
+kubectl delete pvc <nome-do-pvc>
+  -> apaga o pedido. Com reclaimPolicy Delete, o disco vai junto
