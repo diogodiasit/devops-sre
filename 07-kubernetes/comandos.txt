@@ -215,3 +215,20 @@ kubectl delete pod <pod>
 
 kubectl delete pvc <nome-do-pvc>
   -> apaga o pedido. Com reclaimPolicy Delete, o disco vai junto
+
+# ===== AKS (referência, não executados) =====
+
+az login                                         # entra na conta Azure (abre o navegador)
+az group create --name rg-teste-aks --location <regiao>
+                                                 # cria o grupo de recursos do teste (apagar o grupo = apagar tudo)
+az aks create --resource-group rg-teste-aks --name aks-teste --node-count 1
+                                                 # cria o cluster com 1 node; o tamanho da VM é opção a conferir na documentação
+az aks get-credentials --resource-group rg-teste-aks --name aks-teste
+                                                 # baixa o kubeconfig e liga o kubectl ao cluster
+kubectl get nodes                                # confere os nodes do AKS (mesmo comando do minikube)
+az aks upgrade --resource-group rg-teste-aks --name aks-teste --kubernetes-version <versao>
+                                                 # atualiza a versão do cluster (Control Plane e nodes)
+az aks update --resource-group rg-teste-aks --name aks-teste --auto-upgrade-channel stable
+                                                 # liga o canal de atualização automática (none, patch, stable, rapid)
+az group delete --name rg-teste-aks              # LIMPEZA: apaga o grupo e tudo dentro (evita gasto esquecido)
+# Antes de usar: conferir os parâmetros na documentação atual, porque o az muda com as versões

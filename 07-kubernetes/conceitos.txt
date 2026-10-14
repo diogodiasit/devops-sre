@@ -286,3 +286,48 @@ PRODUÇÃO
 - Banco em produção costuma ser gerenciado (Azure SQL, PostgreSQL Flexible).
 - Secret/ConfigMap em volume entregam config ao pod (temporário).
   PVC guarda dado da aplicação (permanece).
+
+=== AKS (Azure Kubernetes Service) ===
+
+- Serviço gerenciado da Azure para criar e operar um cluster Kubernetes completo.
+  É o Kubernetes de verdade (mesmo kubectl e YAMLs).
+- Azure cuida: Control Plane (apiserver, etcd, scheduler), redundância, falhas, certificados
+  e manutenção dele. Eu não vejo nem acesso essas máquinas, só converso com a API pelo kubectl.
+  Publica também imagem nova de node (SO) toda semana.
+- Eu cuido: nodes (tamanho, quantidade, node pools, custo), atualização de versão, rede (VNet,
+  Private Endpoint, firewall), segurança (RBAC, Entra ID, Secrets), backup, monitoramento e
+  aplicações (réplicas suficientes, probes, HPA).
+- O AKS provisiona os nodes (VMs na minha conta), mas a responsabilidade por eles é minha.
+- Sem AKS (self-managed): eu monto e mantenho o Control Plane (3 servidores para alta
+  disponibilidade), o etcd e o backup dele, os certificados e as atualizações.
+- Modelo de responsabilidade compartilhada: a nuvem cuida do cérebro, eu cuido do resto.
+- Não é SaaS: é serviço gerenciado (mais perto de PaaS). SaaS = software pronto; IaaS = só a VM.
+
+ATUALIZAÇÕES
+- Por padrão NADA atualiza sozinho (canal none): o cluster fica na versão em que foi criado.
+- Cada versão do Kubernetes tem cerca de 12 meses de suporte; depois fica sem suporte.
+- Control Plane e nodes precisam ficar em versões próximas; o AKS atualiza o Control Plane e depois os nodes.
+- Atualizar: manual (CLI, portal ou IaC) ou por canal automático (patch, stable, rapid), com janela de manutenção.
+- Imagem do node (SO) é outro tipo de atualização: sai toda semana, mas nodes já rodando só
+  recebem se eu aplicar (ou ligar o canal NodeImage).
+- Atualizar nodes recria as VMs: a aplicação precisa de 2 ou mais réplicas e probes.
+- Testar a atualização em cluster de teste antes de produção.
+
+VARIAÇÕES E ALTERNATIVAS NA AZURE
+- AKS Standard: o que estudei; mais controle, mais trabalho operacional.
+- AKS Automatic: a Azure assume mais (nodes, escala), com boas práticas já ligadas.
+- Fleet Manager: administra vários clusters juntos (ex.: atualizações coordenadas).
+- Container Apps: roda containers sem eu operar Kubernetes (escala automática).
+- ACI: um container isolado ou tarefa pontual, sem orquestração.
+- Quanto mais a Azure cuida, menos trabalho e menos controle eu tenho.
+- ACR (Container Registry) guarda as imagens; o AKS puxa as imagens de lá.
+
+INTEGRAÇÕES E CUSTO
+- Prontas: Entra ID + RBAC, driver CSI de Azure Disk/Files (StorageClass), type LoadBalancer
+  com IP público real, Cluster Autoscaler (opção do node pool), ACR e Key Vault.
+- Control Plane com nível Free (sem SLA, não é para produção); paga-se as VMs dos nodes e os discos.
+- Conta de estudante: crédito limitado; ao acabar a assinatura é desativada. Pode haver
+  restrição de região, tamanho de VM e cota de vCPUs na criação do cluster.
+- Cuidados na prática: grupo de recursos só para o teste, 1 node pequeno, alerta de orçamento
+  e apagar o grupo de recursos no fim.
+- Mercado prefere Kubernetes gerenciado (AKS/EKS/GKE) a self-managed.
