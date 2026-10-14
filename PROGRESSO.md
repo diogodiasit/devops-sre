@@ -29,7 +29,7 @@
 - [x] Fase 4 — Docker (pasta: 04-docker) — containers, volumes, compose, Docker Hub
 - [x] Fase 5 — CI/CD (pasta: 05-cicd) — GitHub Actions, PR automatizado, branch protection, build e publicação automática de imagem Docker
 - [x] Fase 6 — Azure DevOps (pasta: 06-azure-devops) — Azure Repos, Pipelines, Service Connections, Branch Policies
-- [ ] Fase 7 — Kubernetes (pasta: 07-kubernetes) — em andamento: Deployment, Service, Ingress, ConfigMap e Secret, probes (faltam HPA, volumes e StatefulSet, RBAC e AKS)
+- [x] Fase 7 — Kubernetes (pasta: 07-kubernetes) — Deployment, Service, Ingress, ConfigMap e Secret, probes, HPA, volumes persistentes, namespaces e RBAC (conceito), AKS (conceito)
 - [ ] Fase 8 — Terraform
 - [ ] Fase 9 — Monitoramento
 - [ ] Fase 10 (chefão final) — Projetos de entrevista real, incluindo migração on-premise → Azure
@@ -62,3 +62,8 @@
 - Prática: PVC de 1Gi no minikube → Bound; pod gravador escreve nota; pod apagado; pod leitor novo lê a mesma nota; limpeza com reclaimPolicy Delete
 - Regras: pod aponta para o PVC (nunca o PV); 1 PVC = 1 PV; tamanho só aumenta; nome não muda; Retain em produção
 - Extras vistos: snapshot e backup (disco persistente não é backup), responsabilidade compartilhada com a nuvem, StatefulSet só no conceito, custo do projeto final na Azure
+
+### AKS ✅ (só conceito)
+- Lógica: AKS = Kubernetes com o Control Plane gerenciado pela Azure; eu cuido de nodes, rede, segurança, atualizações, custo e aplicações
+- Comparação: sem AKS (self-managed) eu monto e mantenho o Control Plane, o etcd, os certificados e as atualizações
+- Extras vistos: responsabilidade compartilhada, SaaS x PaaS x IaaS, Standard x Automatic x Fleet Manager, AKS x Container Apps x ACI, atualizações (canais, nodes, imagem), custo e conta de estudante
