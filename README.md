@@ -11,6 +11,7 @@ Este repositório documenta minha jornada de estudos para me tornar SRE/DevOps. 
 - [Fase 05 - CI/CD](./05-cicd/) — GitHub Actions, testes automatizados em Pull Request, branch protection, build e publicação automática de imagem Docker (projeto prático: `projeto-agendamento`)
 - [Fase 06 - Azure DevOps](./06-azure-devops/) — Azure Repos, Azure Pipelines, Service Connections, Branch Policies (Build Validation), comparativo com GitHub Actions
 - [Fase 07 - Kubernetes](./07-kubernetes/) — Deployment, Service, Ingress, ConfigMap e Secret, probes de saúde, HPA (autoscaling horizontal), volumes persistentes (PVC e PV); YAMLs praticados em yamls/ e troubleshooting real de certificado TLS no minikube
+- [Fase 08 - Terraform](./08-terraform/) — infraestrutura como código: providers, variables, outputs, state, ciclo init/validate/plan/apply/destroy, fluxo de PR com esteira de IaC; laboratório local (providers local e random) e código Azure (azurerm) validado
 
 ## Como uso este repositório
 
