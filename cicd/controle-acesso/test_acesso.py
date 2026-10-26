@@ -16,9 +16,8 @@ from sistema_acesso import (
 
 # ---------------------------------------------------------
 # FIXTURE: roda automaticamente ANTES de cada teste abaixo.
-# Resolve o problema que você identificou: sem isso, um teste
-# poderia "sujar" os dados pro próximo. Aqui a gente limpa o
-# "quadro branco" (os dicionários) antes de cada teste começar.
+# Sem isso, um teste poderia "sujar" os dados do próximo.
+# Os dicionários em memória são limpos antes de cada teste.
 # ---------------------------------------------------------
 @pytest.fixture(autouse=True)
 def limpar_dados():
@@ -46,7 +45,7 @@ def test_acesso_liberado_dentro_do_horario():
     usuario = criar_usuario(nome="Diogo Dias", cargo="Analista")
     criar_credencial(usuario_id=usuario["id"], numero_cartao="111")
 
-    # Aqui a gente "informa" o horário simulado, como combinamos
+    # O horário é simulado via parâmetro, sem depender do relógio real
     controladora_falsa = MockControladora(resposta="liberado")
     resultado = processar_tentativa_acesso(
         numero_cartao="111",

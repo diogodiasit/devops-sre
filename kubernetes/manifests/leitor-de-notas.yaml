@@ -8,7 +8,7 @@ metadata:
   name: leitor-de-notas
 
 spec:
-  # Declaro a fonte do disco (mesmo pedido de antes)
+  # Fonte do disco (mesmo pedido usado pelo gravador)
   volumes:
     - name: disco-do-pod
       persistentVolumeClaim:

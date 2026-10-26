@@ -12,4 +12,4 @@ metadata:
   name: segredo-app             # nome do Secret
 type: Opaque                    # tipo genérico de Secret
 stringData:                     # você escreve em texto puro, e o Kubernetes converte para base64 ao guardar
-  DB_PASSWORD: "senha123"       # a senha do banco
+  DB_PASSWORD: "senha-de-exemplo" # valor fictício de lab; em produção, usar cofre externo (Key Vault)

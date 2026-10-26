@@ -1,75 +1,114 @@
-Meu primeiro arquivo Linux
-Segundo comando aprendido: cat
-ps aux - lista todos os processos do sistema (a=todos usuarios, u=mostra usuario, x=mostra sem terminal)
-ps aux | grep nome - filtra processos pelo nome (| pipe passa a saida de um comando pro outro)
-top - mostra processos em tempo real, como o Task Manager do Windows (sair: tecla Q)
-df -h - mostra espaco em disco (df=disk free, -h=formato legivel KB/MB/GB)
-free -h - mostra uso de memoria RAM e Swap (-h=formato legivel)
-pwd - mostra o diretorio atual onde voce esta
-ls - lista arquivos e pastas da pasta atual
-ls -la - lista arquivos com detalhes e arquivos ocultos (-l=detalhes, -a=ocultos)
-mkdir nome - cria uma pasta nova (mkdir=make directory)
-cd nome - navega para dentro de uma pasta (cd=change directory)
-cd .. - volta uma pasta acima (.. significa pasta pai)
-touch arquivo.txt - cria um arquivo vazio
-echo 'texto' > arquivo.txt - escreve texto no arquivo substituindo o conteudo (> substitui)
-echo 'texto' >> arquivo.txt - adiciona texto no final do arquivo sem apagar o que tinha (>> adiciona)
-cat arquivo.txt - mostra o conteudo de um arquivo
-grep 'palavra' arquivo.txt - procura uma palavra dentro de um arquivo e destaca onde ela aparece
-chmod 600 arquivo - muda permissoes do arquivo (6=dono ler+escrever, 0=grupo sem permissao, 0=outros sem permissao)
-chmod 755 arquivo - dono faz tudo (7), grupo e outros podem ler e executar (5)
-chmod 644 arquivo - dono ler+escrever (6), grupo e outros so leem (4) - padrao para arquivos normais
-chmod 777 arquivo - todos tem todas as permissoes - evitar em producao
-r=ler(4) w=escrever(2) x=executar(1) - soma os numeros para definir a permissao
-systemctl status servico - mostra o estado atual do servico (active/inactive)
-systemctl start servico - inicia o servico
-systemctl stop servico - para o servico
-systemctl restart servico - para e inicia o servico novamente
-systemctl enable servico - ativa inicializacao automatica quando o sistema ligar
-systemctl disable servico - desativa inicializacao automatica
-journalctl -u servico - mostra todos os logs de um servico especifico (u=unit/servico)
-journalctl - mostra todos os logs do sistema sem filtro
-journalctl -u servico -f - acompanha os logs em tempo real (f=follow, igual ao tail -f)
-grep -i "palavra" arquivo - busca ignorando maiusculas e minusculas (i=ignore case)
-grep -v "palavra" arquivo - mostra linhas que NAO contem a palavra (v=invert)
-grep -n "palavra" arquivo - mostra o numero da linha onde a palavra foi encontrada (n=number)
-grep -c "palavra" arquivo - conta quantas linhas contem a palavra (c=count)
-grep -r "palavra" . - busca em todos os arquivos da pasta atual (r=recursive)
-wc -l arquivo - conta quantas linhas tem um arquivo (wc=word count, -l=lines)
-wc -w arquivo - conta quantas palavras tem um arquivo (w=words)
-wc -c arquivo - conta quantos caracteres tem um arquivo (c=characters)
-find . -name "*.txt" - busca todos os arquivos que terminam com .txt na pasta atual
-find . -type f - busca so arquivos, ignorando pastas (f=file)
-find . -type d - busca so pastas (d=directory)
-find . -name "*.txt" -type f - combina dois filtros, busca arquivos que terminam com .txt
-find . -name "*.log" - busca todos os arquivos de log na pasta atual
-env - lista todas as variaveis de ambiente do sistema
-echo $VARIAVEL - exibe o valor de uma variavel ($ acessa o valor da variavel)
-NOME="valor" - cria uma variavel temporaria (some quando fechar o terminal)
-export NOME="valor" - cria uma variavel e disponibiliza pro sistema todo
-export PATH="/novo/caminho:$PATH" - adiciona um novo caminho no PATH sem apagar os existentes
-source ~/.bashrc - recarrega o arquivo de configuracao do terminal sem precisar fechar
-~/.bashrc - arquivo de configuracao do terminal, executado toda vez que o terminal abre
+# Linux — Comandos
 
-# Gerenciamento de pacotes (apt)
-sudo apt update          # atualiza lista de pacotes disponíveis
-sudo apt upgrade         # instala atualizações dos pacotes já instalados
-sudo apt install nginx   # instala um pacote (exemplo: nginx)
-sudo apt remove nginx    # desinstala, mantém configs
-sudo apt purge nginx     # desinstala tudo, incluindo configs
+Referência dos comandos de administração Linux usados nos labs (Ubuntu no WSL).
 
-# Manipulação de arquivos (cp, mv, rm, rmdir)
-cp arquivo-origem.txt arquivo-destino.txt   # copia um arquivo
-cp -r pasta-origem/ pasta-destino/          # copia uma pasta inteira (-r = recursivo)
-mv arquivo-antigo.txt arquivo-novo.txt      # move OU renomeia um arquivo
-rm arquivo.txt                              # apaga um arquivo (sem lixeira, sem volta)
-rm -r pasta/                                # apaga pasta e tudo dentro dela
-rmdir pasta/                                # apaga pasta, mas só se estiver vazia
+## Navegação e arquivos
 
+| Comando | O que faz |
+|---|---|
+| `pwd` | Mostra o diretório atual |
+| `ls` | Lista arquivos e pastas do diretório atual |
+| `ls -la` | Lista com detalhes (`-l`) e inclui arquivos ocultos (`-a`) |
+| `mkdir nome` | Cria uma pasta (*make directory*) |
+| `cd nome` | Entra em uma pasta (*change directory*) |
+| `cd ..` | Volta um nível (`..` = pasta pai) |
+| `touch arquivo.txt` | Cria um arquivo vazio |
+| `cat arquivo.txt` | Exibe o conteúdo de um arquivo |
+| `echo 'texto' > arquivo.txt` | Escreve no arquivo **substituindo** o conteúdo (`>`) |
+| `echo 'texto' >> arquivo.txt` | **Adiciona** ao final do arquivo, sem apagar o que existe (`>>`) |
 
-## Ver logs de um servico em tempo real, na maquina host
-journalctl -f
-# -f = follow, mostra os logs conforme acontecem, ao vivo
-# Util para reproduzir um erro e ver o problema acontecendo na hora
-# So funciona em servicos gerenciados pelo systemd, na maquina host
-# (dentro de containers, geralmente usar "docker logs -f" no lugar)
+## Copiar, mover e remover
+
+| Comando | O que faz |
+|---|---|
+| `cp origem.txt destino.txt` | Copia um arquivo |
+| `cp -r pasta-origem/ pasta-destino/` | Copia uma pasta inteira (`-r` = recursivo) |
+| `mv antigo.txt novo.txt` | Move **ou** renomeia um arquivo |
+| `rm arquivo.txt` | Apaga um arquivo (sem lixeira, sem volta) |
+| `rm -r pasta/` | Apaga a pasta e todo o conteúdo |
+| `rmdir pasta/` | Apaga a pasta somente se estiver vazia |
+
+## Busca em arquivos
+
+| Comando | O que faz |
+|---|---|
+| `grep 'palavra' arquivo` | Procura a palavra e destaca onde aparece |
+| `grep -i "palavra" arquivo` | Ignora maiúsculas/minúsculas (`-i` = *ignore case*) |
+| `grep -v "palavra" arquivo` | Mostra as linhas que **não** contêm a palavra (`-v` = *invert*) |
+| `grep -n "palavra" arquivo` | Mostra o número da linha (`-n` = *number*) |
+| `grep -c "palavra" arquivo` | Conta as linhas que contêm a palavra (`-c` = *count*) |
+| `grep -r "palavra" .` | Busca em todos os arquivos da pasta atual (`-r` = recursivo) |
+| `find . -name "*.txt"` | Busca arquivos terminados em `.txt` a partir da pasta atual |
+| `find . -name "*.log"` | Busca arquivos de log |
+| `find . -type f` | Só arquivos (`f` = *file*) |
+| `find . -type d` | Só pastas (`d` = *directory*) |
+| `find . -name "*.txt" -type f` | Combina filtros: arquivos terminados em `.txt` |
+| `wc -l arquivo` | Conta linhas (`wc` = *word count*, `-l` = *lines*) |
+| `wc -w arquivo` | Conta palavras (`-w` = *words*) |
+| `wc -c arquivo` | Conta caracteres/bytes (`-c`) |
+
+## Permissões
+
+Cada dígito do `chmod` é a soma de `r` = ler (4), `w` = escrever (2), `x` = executar (1), na ordem **dono / grupo / outros**.
+
+| Comando | O que faz |
+|---|---|
+| `chmod 600 arquivo` | Dono lê e escreve (6); grupo e outros sem acesso (0) — uso típico: chaves e segredos |
+| `chmod 644 arquivo` | Dono lê e escreve (6); grupo e outros só leem (4) — padrão para arquivos comuns |
+| `chmod 755 arquivo` | Dono tudo (7); grupo e outros leem e executam (5) — padrão para scripts e pastas |
+| `chmod 777 arquivo` | Todos com todas as permissões — **evitar em produção** |
+
+## Processos e recursos
+
+| Comando | O que faz |
+|---|---|
+| `ps aux` | Lista todos os processos (`a` = todos os usuários, `u` = mostra o dono, `x` = inclui processos sem terminal) |
+| `ps aux \| grep nome` | Filtra processos pelo nome (`\|` = pipe, passa a saída de um comando para o próximo) |
+| `top` | Processos em tempo real, equivalente ao Gerenciador de Tarefas (sair: `q`) |
+| `df -h` | Espaço em disco (`df` = *disk free*, `-h` = formato legível KB/MB/GB) |
+| `free -h` | Uso de memória RAM e swap (`-h` = formato legível) |
+
+## Serviços (systemd)
+
+| Comando | O que faz |
+|---|---|
+| `systemctl status servico` | Estado atual do serviço (active/inactive) |
+| `systemctl start servico` | Inicia o serviço |
+| `systemctl stop servico` | Para o serviço |
+| `systemctl restart servico` | Para e inicia novamente |
+| `systemctl enable servico` | Ativa a inicialização automática no boot |
+| `systemctl disable servico` | Desativa a inicialização automática |
+
+## Logs (journald)
+
+| Comando | O que faz |
+|---|---|
+| `journalctl` | Todos os logs do sistema, sem filtro |
+| `journalctl -u servico` | Logs de um serviço específico (`-u` = *unit*) |
+| `journalctl -u servico -f` | Acompanha os logs do serviço em tempo real (`-f` = *follow*, como `tail -f`) |
+| `journalctl -f` | Acompanha todos os logs ao vivo |
+
+> **Uso em troubleshooting:** deixar `journalctl -f` aberto enquanto se reproduz o erro mostra o problema acontecendo na hora. Só funciona para serviços gerenciados pelo systemd no host; dentro de containers, use `docker logs -f`.
+
+## Variáveis de ambiente e shell
+
+| Comando | O que faz |
+|---|---|
+| `env` | Lista todas as variáveis de ambiente |
+| `echo $VARIAVEL` | Exibe o valor de uma variável (`$` acessa o valor) |
+| `NOME="valor"` | Cria uma variável local do shell (some ao fechar o terminal) |
+| `export NOME="valor"` | Cria a variável e a disponibiliza para os processos filhos |
+| `export PATH="/novo/caminho:$PATH"` | Adiciona um caminho ao `PATH` sem apagar os existentes |
+| `source ~/.bashrc` | Recarrega a configuração do shell sem fechar o terminal |
+
+`~/.bashrc` é o arquivo de configuração do Bash, executado sempre que um terminal interativo é aberto.
+
+## Pacotes (apt)
+
+| Comando | O que faz |
+|---|---|
+| `sudo apt update` | Atualiza a lista de pacotes disponíveis |
+| `sudo apt upgrade` | Instala as atualizações dos pacotes já instalados |
+| `sudo apt install nginx` | Instala um pacote (exemplo: nginx) |
+| `sudo apt remove nginx` | Desinstala, mantendo os arquivos de configuração |
+| `sudo apt purge nginx` | Desinstala tudo, incluindo as configurações |

@@ -1,34 +1,63 @@
-git init - inicia um repositorio Git na pasta atual
-git config --global user.name "nome" - define seu nome no Git (global=vale pro sistema todo)
-git config --global user.email "email" - define seu email no Git
-git config --global init.defaultBranch main - define "main" como nome padrao da branch principal
-git config --global --list - mostra todas as configuracoes do Git
-git remote add origin url - conecta sua pasta local ao repositorio do GitHub (origin=apelido do repositorio remoto)
-git add . - marca todos os arquivos da pasta para serem enviados (. = tudo da pasta atual)
-git commit -m "mensagem" - registra uma foto dos arquivos marcados com uma mensagem descritiva
-git push - envia os arquivos registrados pro GitHub
-git push -u origin main - envia pela primeira vez e salva a configuracao (na proxima vez so git push ja basta)
-git branch -m main - renomeia a branch atual para main
-# Branches e merge (Semana 2)
-git branch nome-da-branch      # cria uma branch nova (nao entra nela ainda)
-git checkout nome-da-branch    # troca para uma branch que ja existe
-git checkout -b nome-da-branch # cria E ja entra na branch, tudo em um comando
-git branch                     # lista as branches, * marca em qual voce esta
-git merge nome-da-branch       # traz as mudancas de outra branch para a atual
-git branch -d nome-da-branch   # apaga uma branch que ja foi mergeada
+# Git — Comandos
 
-# .gitignore
-touch .gitignore                # cria o arquivo especial que o Git reconhece
-# Dentro dele, listar o que NUNCA deve subir pro repositorio:
-# .env, *.pem, *.key           -> segredos e credenciais
-# .DS_Store, Thumbs.db          -> lixo de sistema operacional
-# .vscode/, .idea/              -> configuracao pessoal de editor
+Referência dos comandos de versionamento usados no dia a dia deste repositório.
 
-## Investigar historico - quem mudou o que, e quando
-git log
-# mostra o historico de commits
+## Configuração inicial
 
-git blame <arquivo>
-# mostra, linha por linha, quem foi o ultimo a mudar cada linha e em qual commit
-# muito usado quando algo quebra logo depois de um deploy:
-# "o que mudou desde a ultima versao que funcionava?"
+| Comando | O que faz |
+|---|---|
+| `git init` | Inicia um repositório Git na pasta atual |
+| `git config --global user.name "nome"` | Define o nome do autor (`--global` = vale para todos os repositórios do usuário) |
+| `git config --global user.email "email"` | Define o e-mail do autor |
+| `git config --global init.defaultBranch main` | Define `main` como nome padrão da branch principal |
+| `git config --global --list` | Mostra todas as configurações globais |
+| `git branch -m main` | Renomeia a branch atual para `main` (`-m` = *move*) |
+
+## Fluxo básico
+
+| Comando | O que faz |
+|---|---|
+| `git remote add origin <url>` | Conecta o repositório local ao remoto (`origin` = apelido do remoto) |
+| `git add .` | Adiciona ao *stage* todas as mudanças da pasta atual (`.` = tudo) |
+| `git commit -m "mensagem"` | Registra um snapshot do que está no *stage*, com mensagem descritiva |
+| `git push` | Envia os commits para o remoto |
+| `git push -u origin main` | Primeiro envio: `-u` grava o *upstream*, e depois basta `git push` |
+
+## Branches e merge
+
+| Comando | O que faz |
+|---|---|
+| `git branch` | Lista as branches; `*` marca a atual |
+| `git branch nome-da-branch` | Cria uma branch (sem entrar nela) |
+| `git checkout nome-da-branch` | Troca para uma branch existente |
+| `git checkout -b nome-da-branch` | Cria a branch **e** entra nela (`-b` = *branch*) |
+| `git merge nome-da-branch` | Traz as mudanças de outra branch para a atual |
+| `git branch -d nome-da-branch` | Apaga uma branch já mergeada (`-d` = *delete*, seguro) |
+
+## .gitignore
+
+`touch .gitignore` cria o arquivo que lista o que **nunca** deve ser versionado:
+
+```gitignore
+# Segredos e credenciais
+.env
+*.pem
+*.key
+
+# Lixo de sistema operacional
+.DS_Store
+Thumbs.db
+
+# Configuração pessoal de editor
+.vscode/
+.idea/
+```
+
+## Investigação de histórico
+
+| Comando | O que faz |
+|---|---|
+| `git log` | Histórico de commits |
+| `git blame <arquivo>` | Mostra, linha por linha, o último commit e autor que alterou cada linha |
+
+> **Em produção:** `git log` e `git blame` respondem rápido à pergunta "o que mudou desde a última versão que funcionava?" quando algo quebra logo após um deploy.

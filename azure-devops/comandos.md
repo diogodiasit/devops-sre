@@ -1,18 +1,40 @@
-# Fase 6 - Azure DevOps - Comandos praticados
+# Azure DevOps — Comandos
 
-## Clonar repositório vazio do Azure Repos
-git clone https://diogodiasit@dev.azure.com/diogodiasit/estudos-devops-sre/_git/estudos-devops-sre estudos-devops-sre-azure
+Comandos usados para levar o projeto de CI/CD para o Azure Repos e operar o fluxo de branch + Pull Request.
 
-## Copiar projeto existente para o novo repositório
-cp -r ~/estudos-devops-sre/projeto-agendamento ~/estudos-devops-sre-azure/
+## Clonar o repositório do Azure Repos
 
-## Fluxo padrão de branch + PR (igual GitHub, so muda a interface)
-git checkout -b nome-da-branch
-git add .
-git commit -m "mensagem"
-git push origin nome-da-branch
-# Depois: abrir PR pela interface do Azure DevOps
+```bash
+git clone https://dev.azure.com/<organizacao>/<projeto>/_git/<repositorio> <pasta-local>
+```
 
-## Sincronizar main local com o Azure (mesmo principio do GitHub)
-git checkout main
-git pull
+- `git clone <url> <pasta-local>`: copia o repositório remoto para a pasta indicada.
+- A URL segue o formato `dev.azure.com/<organização>/<projeto>/_git/<repositório>`.
+
+## Copiar o projeto existente para o novo repositório
+
+```bash
+cp -r ~/estudos-devops-sre/projeto-agendamento ~/<pasta-local>/
+```
+
+- `cp -r`: copia a pasta inteira (`-r` = recursivo).
+
+## Fluxo de branch + Pull Request
+
+O fluxo é o mesmo do GitHub; muda só a interface.
+
+| Comando | O que faz |
+|---|---|
+| `git checkout -b nome-da-branch` | Cria a branch de trabalho e entra nela |
+| `git add .` | Adiciona as mudanças ao *stage* |
+| `git commit -m "mensagem"` | Registra o commit |
+| `git push origin nome-da-branch` | Envia a branch para o Azure Repos |
+
+Depois do push, o Pull Request é aberto pela interface do Azure DevOps (**Repos > Pull requests**).
+
+## Sincronizar a main local
+
+| Comando | O que faz |
+|---|---|
+| `git checkout main` | Volta para a branch principal |
+| `git pull` | Baixa e integra as mudanças do remoto (após o merge do PR) |

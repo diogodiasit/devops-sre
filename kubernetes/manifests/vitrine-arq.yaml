@@ -1,7 +1,7 @@
 # RESUMO: este Deployment cria 1 Pod que recebe o Secret "segredo-app"
 # como ARQUIVOS dentro da pasta /etc/segredos (em vez de variáveis).
 #
-# O Secret NÃO é criado aqui. Ele já existe no cluster (criamos no config-teste.yaml).
+# O Secret NÃO é criado aqui. Ele já existe no cluster (criado pelo config-teste.yaml).
 # Este arquivo só diz: "pegue aquele Secret e mostre como arquivos neste Pod".
 #
 # Como funciona (duas partes que se ligam pelo nome "pasta-segredos"):

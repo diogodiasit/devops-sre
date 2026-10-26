@@ -1,47 +1,56 @@
-# Fase 6 - Azure DevOps - Conceitos e duvidas reais
+# Azure DevOps — Conceitos
 
-## Tabela de traducao GitHub <-> Azure DevOps
-- Actions -> Pipelines
-- Repositorio -> Repos
-- .github/workflows/nome.yml -> azure-pipelines.yml (raiz do repo)
-- on: -> trigger: (push) ou pr: (pull request)
-- runs-on: -> pool: vmImage:
-- run: -> script:
-- name: -> displayName:
-- uses: -> task:
-- Secrets -> Service Connection
-- Branch protection -> Branch Policies
+Equivalências com o GitHub Actions e comportamentos do Azure Pipelines com Azure Repos.
 
-## Duvida real 1: pr: no YAML nao funciona no Azure Repos
-O bloco "pr:" so funciona para repositorios GitHub e Bitbucket.
-Para Azure Repos, o gatilho de Pull Request vem de uma Branch Policy
-(Build Validation), configurada fora do arquivo YAML, em Repos > Branches.
+## Equivalência GitHub ↔ Azure DevOps
 
-## Duvida real 2: trigger: e o equivalente a push
-No Azure, "trigger:" sozinho ja significa "gatilho de push" - nao precisa
-escrever a palavra push em lugar nenhum. Por isso, para rodar SO em PR,
-e preciso desligar o trigger com:
+| GitHub | Azure DevOps |
+|---|---|
+| Actions | Pipelines |
+| Repositório | Repos |
+| `.github/workflows/nome.yml` | `azure-pipelines.yml` (raiz do repositório) |
+| `on:` | `trigger:` (push) ou `pr:` (pull request) |
+| `runs-on:` | `pool: vmImage:` |
+| `run:` | `script:` |
+| `name:` | `displayName:` |
+| `uses:` | `task:` |
+| Secrets | Service Connection |
+| Branch protection | Branch Policies |
+
+## `pr:` no YAML não funciona com Azure Repos
+
+- O bloco `pr:` só vale para repositórios **GitHub e Bitbucket**.
+- No Azure Repos, o gatilho de Pull Request vem de uma **Branch Policy (Build Validation)**, configurada fora do YAML em **Repos > Branches**.
+
+## `trigger:` já significa push
+
+- No Azure Pipelines, `trigger:` sozinho é o gatilho de push — não existe a palavra `push`.
+- Para rodar **somente** em PR, é preciso desligar o trigger de push:
+
+```yaml
 trigger:
   branches:
     exclude:
       - '*'
+```
 
-## Duvida real 3: conflito de merge nao resolvido
-Um merge que gera conflito precisa ser resolvido manualmente (remover as
-marcacoes <<<<<<<, =======, >>>>>>>). Se voce editar o arquivo com nano
-sem perceber essas marcacoes, elas ficam salvas junto, e o arquivo vira
-invalido sem nenhum erro aparente.
+## Pipeline como "preview" durante o PR
 
-## Duvida real 4: push x abrir PR sao acoes diferentes
-git push so envia o codigo. Abrir Pull Request e uma acao manual, feita
-na interface, feita DEPOIS do push. Uma nao dispara a outra sozinha.
+Com uma Branch Policy configurada, pipelines com trigger na branch de destino podem rodar automaticamente durante o PR, como uma prévia do que aconteceria após o merge — antes do **Complete**.
 
-## Duvida real 5: pipeline roda como "preview" durante o PR
-Quando existe uma Branch Policy configurada, pipelines com trigger na
-branch de destino podem rodar automaticamente durante o PR, como um
-"preview" do que aconteceria apos o merge - antes mesmo de clicar Complete.
+## Push x abrir Pull Request
+
+`git push` só envia o código. Abrir o Pull Request é uma ação separada, feita na interface **depois** do push; uma não dispara a outra.
+
+## Conflito de merge não resolvido
+
+- Um merge com conflito exige resolução manual, removendo os marcadores `<<<<<<<`, `=======` e `>>>>>>>`.
+- Se o arquivo for salvo com os marcadores (por exemplo, editando no `nano` sem percebê-los), ele fica inválido sem nenhum erro aparente no Git.
+
+> **Em produção:** em YAML de pipeline, um marcador esquecido quebra a esteira inteira. Revise o diff antes do commit.
 
 ## Service Connection
-Equivalente ao par de secrets do GitHub (usuario + token), mas empacotado
-num unico objeto reutilizavel, configurado em Project Settings > Service
-connections. No YAML, referenciado so pelo nome (containerRegistry).
+
+- Equivale ao par de secrets do GitHub (usuário + token), mas empacotado em um único objeto reutilizável.
+- Configurado em **Project Settings > Service connections**.
+- No YAML, é referenciado só pelo nome (ex.: `containerRegistry`), sem expor a credencial.

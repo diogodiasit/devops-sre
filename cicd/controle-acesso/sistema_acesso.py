@@ -37,10 +37,10 @@ def verificar_horario(hora_tentativa, hora_inicio, hora_fim):
 class MockControladora:
     # Isto é a "controladora falsa" — substitui o hardware físico nos testes.
     # Em vez de acionar uma catraca de verdade, ela só devolve a resposta
-    # que a gente definir na hora de criar o teste (liberado ou negado).
+    # definida na criação do teste (liberado ou negado).
 
     def __init__(self, resposta="liberado"):
-        # Roda quando criamos uma controladora falsa nova
+        # Executado ao criar uma nova controladora falsa
         self.resposta = resposta          # o que ela vai "responder"
         self.comando_enviado = None       # guarda o último comando recebido
 

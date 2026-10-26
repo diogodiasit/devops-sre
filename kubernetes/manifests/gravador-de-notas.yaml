@@ -8,13 +8,13 @@ metadata:
   name: gravador-de-notas
 
 spec:
-  # PRIMEIRO declaro de onde vem o disco...
+  # PRIMEIRO: de onde vem o disco...
   volumes:
     # Apelido do disco SÓ dentro deste pod. Serve para ligar com o volumeMounts abaixo.
     - name: disco-do-pod
       persistentVolumeClaim:
-        # AQUI está o ponto central da aula: aponto para o PEDIDO (PVC) pelo nome.
-        # Não aponto para o PV nem para a Azure.
+        # Ponto central: o pod aponta para o PEDIDO (PVC) pelo nome.
+        # Não aponta para o PV nem para o provedor de nuvem.
         claimName: pedido-disco-dados
 
   containers:
@@ -25,7 +25,7 @@ spec:
       # Escreve uma frase no arquivo e depois fica "dormindo" para o pod não terminar
       command: ["sh", "-c", "echo 'Esta nota deve sobreviver ao pod' > /dados/nota.txt && sleep 3600"]
 
-      # ...DEPOIS digo em qual pasta do container o disco aparece
+      # ...DEPOIS: em qual pasta do container o disco aparece
       volumeMounts:
         # Mesmo apelido declarado acima em volumes
         - name: disco-do-pod

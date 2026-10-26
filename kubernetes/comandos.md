@@ -1,234 +1,278 @@
-# Fase 7 - Kubernetes - Modulo 1 (Deploy) - Comandos praticados
+# Kubernetes — Comandos
 
-## Instalacao
+Referência dos comandos usados nos labs de Kubernetes (minikube no WSL) e da referência de AKS. Os manifestos citados estão em [manifests/](./manifests/).
+
+## Instalação (minikube e kubectl)
+
+```bash
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
 sudo install minikube-linux-amd64 /usr/local/bin/minikube
 
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+```
 
-## Subir e gerenciar o cluster
-minikube start --force
-minikube status
-minikube ssh
-minikube delete
+- `curl -LO`: baixa o arquivo seguindo redirecionamentos (`-L`) e salvando com o nome original (`-O`).
+- `$(curl -L -s .../stable.txt)`: consulta, em modo silencioso (`-s`), a versão estável atual do kubectl.
+- `install -o root -g root -m 0755`: copia o binário definindo dono (`-o`), grupo (`-g`) e permissão de execução (`-m 0755`).
 
-kubectl get nodes
-kubectl get pods -n kube-system -o wide
+## Cluster
 
-## Pod solto (sem protecao, so para teste)
-kubectl run meu-primeiro-pod --image=nginx
-kubectl describe pod meu-primeiro-pod
-kubectl delete pod meu-primeiro-pod
+| Comando | O que faz |
+|---|---|
+| `minikube start --force` | Sobe (ou religa) o cluster; `--force` é necessário quando logado como root |
+| `minikube status` | Estado dos componentes do cluster |
+| `minikube ssh` | Abre um shell dentro do node do minikube |
+| `minikube delete` | Apaga o cluster inteiro (inclusive certificados instalados manualmente) |
+| `minikube ip` | IP do container do minikube |
+| `kubectl get nodes` | Lista os nodes e o status (Ready/NotReady) |
+| `kubectl get pods -n kube-system -o wide` | Pods do próprio Kubernetes (`-n` = namespace; `-o wide` = mostra node e IP) |
+| `kubectl get namespaces` | Lista os namespaces do cluster |
 
-## Deployment (forma correta, com auto-recuperacao)
-kubectl create deployment loja-frontend --image=nginx --replicas=3
-kubectl scale deployment loja-frontend --replicas=5
-kubectl get deployment loja-frontend -o wide
+## Contexto do kubectl
 
-## Service (rede estavel para os Pods)
-kubectl expose deployment loja-frontend --port=80 --type=ClusterIP --name=svc-loja-frontend
-kubectl get service svc-loja-frontend -o wide
-kubectl describe service svc-loja-frontend
-kubectl get endpoints svc-loja-frontend
-kubectl get pods --show-labels
+| Comando | O que faz |
+|---|---|
+| `kubectl config current-context` | Qual cluster o kubectl está usando agora |
+| `kubectl cluster-info` | Endereço do kube-apiserver em uso |
+| `minikube update-context` | Corrige o endereço do apiserver no kubeconfig (a porta muda a cada start) |
 
-## Testar acesso (tunel de teste, nao usar em producao)
-kubectl port-forward service/svc-loja-frontend 8080:80
+## Pods e Deployments
 
-## Testar o DNS interno (Pod falando com Pod pelo nome)
+| Comando | O que faz |
+|---|---|
+| `kubectl run pod-teste --image=nginx` | Cria um Pod avulso, sem auto-recuperação (só para teste) |
+| `kubectl describe pod pod-teste` | Detalhes do Pod, incluindo a seção **Events** |
+| `kubectl delete pod pod-teste` | Remove o Pod |
+| `kubectl create deployment loja-frontend --image=nginx --replicas=3` | Cria um Deployment com 3 réplicas (forma correta, com auto-recuperação) |
+| `kubectl scale deployment loja-frontend --replicas=5` | Define o número **final** de réplicas |
+| `kubectl get deployment loja-frontend -o wide` | Estado do Deployment |
+| `kubectl get pods --show-labels` | Lista os Pods com suas labels |
+
+## Service e DNS interno
+
+| Comando | O que faz |
+|---|---|
+| `kubectl expose deployment loja-frontend --port=80 --type=ClusterIP --name=svc-loja-frontend` | Cria um Service com IP interno fixo para o Deployment |
+| `kubectl get service svc-loja-frontend -o wide` | Mostra o Service e o selector |
+| `kubectl describe service svc-loja-frontend` | Detalhes do Service |
+| `kubectl get endpoints svc-loja-frontend` | IPs dos Pods que o Service está atendendo |
+| `kubectl port-forward service/svc-loja-frontend 8080:80` | Túnel de teste da porta local 8080 para o Service (não usar em produção) |
+
+Testar o DNS interno (Pod falando com Pod pelo nome do Service):
+
+```bash
 kubectl run teste --rm -it --image=busybox --restart=Never -- wget -qO- svc-loja-frontend
+```
 
-## YAML declarativo (forma usada em empresa)
-kubectl apply -f 07-kubernetes/webserver.yaml
-kubectl get all -l app=loja-frontend
+- `--rm`: apaga o Pod ao terminar; `-it`: modo interativo com terminal.
+- `--restart=Never`: cria um Pod simples (não um Deployment).
+- `-- wget -qO- svc-loja-frontend`: tudo depois de `--` é o comando do container; `-q` silencioso, `-O-` imprime a resposta na tela.
 
-## Atualizar versao sem downtime (rolling update)
-kubectl set image deployment/loja-frontend nginx=nginx:1.26
-kubectl rollout status deployment/loja-frontend
+## Manifestos declarativos (YAML)
 
-## Voltar para a versao anterior (rollback)
-kubectl rollout undo deployment/loja-frontend
-kubectl rollout history deployment/loja-frontend
+| Comando | O que faz |
+|---|---|
+| `kubectl apply -f manifests/webserver.yaml` | Cria/atualiza o que o arquivo descreve (idempotente) |
+| `kubectl get all -l app=loja-frontend` | Todos os objetos com a label (`-l` = selector de label) |
+| `kubectl apply -f arquivo.yaml --dry-run=client` | Valida o YAML sem aplicar |
+| `kubectl create deployment teste --image=nginx --dry-run=client -o yaml` | Gera o esqueleto do YAML sem criar nada |
+| `kubectl delete -f arquivo.yaml` | Remove do cluster tudo que o arquivo descreve |
+| `kubectl delete deployment app1 app2` | Remove vários objetos pelo nome |
+| `kubectl delete configmap/a secret/b ingress/c` | Remove tipos diferentes (formato `tipo/nome`) |
+| `kubectl get deploy,svc,hpa,pods -o name` | Lista no formato `tipo/nome` |
 
-## Troubleshooting real - certificado do Cloudflare bloqueando pull de imagem
-# Sintoma: Node fica NotReady, ou Pod fica ErrImagePull / ImagePullBackOff
+> **Em produção:** YAML versionado no Git é o padrão (revisão, histórico, sem drift). Comandos imperativos ficam para teste e diagnóstico.
+
+## Rolling update e rollback
+
+| Comando | O que faz |
+|---|---|
+| `kubectl set image deployment/loja-frontend nginx=nginx:1.26` | Troca a imagem do container `nginx`, gradualmente e sem downtime |
+| `kubectl rollout status deployment/loja-frontend` | Acompanha a troca até o fim |
+| `kubectl rollout undo deployment/loja-frontend` | Volta para a versão anterior |
+| `kubectl rollout history deployment/loja-frontend` | Lista as revisões |
+| `kubectl rollout restart deployment vitrine` | Recria os Pods do Deployment, um a um |
+| `kubectl get rs` | ReplicaSets (o atual e os antigos, mantidos para rollback) |
+
+## Ingress
+
+| Comando | O que faz |
+|---|---|
+| `minikube addons enable ingress` | Instala o ingress-nginx como Ingress Controller (só no minikube) |
+| `kubectl get pods -n ingress-nginx` | Pods do controller |
+| `kubectl get jobs -n ingress-nginx` | Jobs `admission-create` e `admission-patch`, que preparam o certificado do webhook |
+| `kubectl logs job/ingress-nginx-admission-create -n ingress-nginx` | Logs de um Job |
+| `kubectl apply -f manifests/apps-teste.yaml` | Cria app1 e app2 com seus Services (ClusterIP) |
+| `kubectl apply -f manifests/ingress-teste.yaml` | Cria as regras `/app1 → svc-app1` e `/app2 → svc-app2` |
+| `kubectl get ingress` | Classe, regras e ADDRESS do Ingress |
+| `kubectl get svc -n ingress-nginx` | Tipo do Service do controller (NodePort no minikube) |
+
+Acesso no laboratório (não existe em produção, onde o IP vem do load balancer da nuvem):
+
+| Comando | O que faz |
+|---|---|
+| `minikube tunnel` | Faz o papel do load balancer da nuvem (o terminal fica preso) |
+| `curl http://192.168.49.2/app1` | Testa a regra do Ingress pelo IP do minikube |
+| `sudo ss -tlnp \| grep ':80 '` | Mostra quem escuta na porta 80 (`-t` TCP, `-l` em escuta, `-n` numérico, `-p` processo) |
+
+> **Pegadinha:** `curl` em `localhost` pode bater num nginx instalado no próprio WSL (rodapé `nginx/1.24.0 (Ubuntu)`), e não no cluster.
+
+## ConfigMap e Secret
+
+| Comando | O que faz |
+|---|---|
+| `kubectl apply -f manifests/config-teste.yaml` | Cria o ConfigMap `config-app` e o Secret `segredo-app` |
+| `kubectl get configmap config-app -o yaml` | Valores em texto puro |
+| `kubectl get secret segredo-app -o yaml` | Valores em base64 |
+| `kubectl get configmap config-app -o jsonpath='{.data.DB_SERVER}'; echo` | Extrai um único campo |
+| `kubectl get secret segredo-app -o jsonpath='{.data.DB_PASSWORD}' \| base64 -d; echo` | Decodifica o valor do Secret (`-d` = decode) |
+| `kubectl apply -f manifests/vitrine.yaml` | Deployment que recebe ConfigMap e Secret como variáveis (`envFrom`) |
+| `kubectl exec deploy/vitrine -- env \| grep DB_` | Lista as variáveis recebidas pelo container |
+| `kubectl apply -f manifests/vitrine-arq.yaml` | Deployment com o Secret montado como **arquivos** em `/etc/segredos` |
+| `kubectl exec deploy/vitrine-arq -- ls /etc/segredos` | Cada chave do Secret vira um arquivo |
+| `kubectl exec deploy/vitrine-arq -- cat /etc/segredos/DB_PASSWORD; echo` | Conteúdo do arquivo |
+
+- Erro `NotFound`: conferir tipo, nome e namespace (ConfigMap e Secret são tipos diferentes).
+- Pod em execução **não** percebe mudança no ConfigMap entregue por variável: é preciso `rollout restart` ou recriar o Pod.
+
+Equivalentes imperativos (referência, não executados no lab):
+
+```bash
+kubectl create configmap ajustes-loja --from-literal=DB_SERVER=banco-prod --from-literal=DB_USER=app_loja
+kubectl create secret generic credenciais-loja --from-literal=DB_PASSWORD=<senha>
+kubectl create deployment vitrine-cmd --image=busybox:1.36 -- sleep 3600
+kubectl set env deployment/vitrine-cmd --from=configmap/config-app   # liga o ConfigMap ao Deployment
+```
+
+## Probes
+
+| Comando | O que faz |
+|---|---|
+| `kubectl apply -f manifests/garcom.yaml` | Pod com readiness probe (`cat /tmp/pronto`) |
+| `kubectl exec deploy/garcom -- touch /tmp/pronto` | Cria o arquivo: o Pod passa de `0/1` para `1/1` |
+| `kubectl exec deploy/garcom -- rm /tmp/pronto` | Remove o arquivo: o Pod volta para `0/1`, **sem** reiniciar |
+| `kubectl exec deploy/garcom -- cat /tmp/pronto; echo $?` | `$?` = código de saída do último comando (0 = sucesso) |
+| `kubectl apply -f manifests/cozinheiro.yaml` | Pod com liveness probe; a aplicação "trava" após 20 s |
+| `kubectl describe pod -l app=cozinheiro` | Events mostram `Liveness probe failed` e o reinício |
+| `kubectl scale deployment cozinheiro --replicas=0` | Pausa o teste sem apagar o Deployment |
+| `kubectl get pod -l app=garcom -o jsonpath='{.items[0].spec.containers[*].name}'; echo` | Nomes dos containers do Pod |
+
+## HPA (Horizontal Pod Autoscaler)
+
+| Comando | O que faz |
+|---|---|
+| `minikube addons enable metrics-server` | Liga a coleta de CPU/memória (no AKS já vem habilitado) |
+| `kubectl top pods -A` | Consumo de todos os Pods, em todos os namespaces (`-A`) |
+| `kubectl top pods -l app=api-catalogo` | Consumo de cada Pod da aplicação |
+| `watch -n 5 kubectl top pods -l app=api-catalogo` | Repete o comando a cada 5 segundos (`-n 5`) |
+| `kubectl apply -f manifests/api-catalogo-deploy.yaml` | Deployment + Service usados no teste de carga |
+| `kubectl apply -f manifests/escalador-catalogo-hpa.yaml` | HPA declarativo (com `behavior`) |
+| `kubectl autoscale deployment api-catalogo --name=escalador-catalogo --cpu-percent=50 --min=2 --max=8` | Alternativa imperativa (não configura `behavior`) |
+| `kubectl get hpa escalador-catalogo` | Estado: TARGETS (uso/meta) e REPLICAS |
+| `kubectl get hpa escalador-catalogo --watch` | Acompanha ao vivo |
+| `kubectl describe hpa escalador-catalogo` | Metrics, Conditions e Events |
+| `kubectl rollout status deployment/api-catalogo` | Acompanha o rolling update |
+
+Gerador de carga:
+
+```bash
+kubectl run gerador-carga --rm -it --image=busybox:1.36 --restart=Never -- /bin/sh -c "while sleep 0.01; do wget -q -O- http://svc-catalogo; done"
+```
+
+- Um Pod temporário dispara requisições contínuas (a cada 0,01 s) contra o Service, elevando a CPU dos Pods da API.
+
+## Volumes persistentes
+
+| Comando | O que faz |
+|---|---|
+| `kubectl get storageclass` | Tipos de disco que o cluster sabe provisionar |
+| `kubectl apply -f manifests/pedido-disco-dados.yaml` | Cria o PVC; o PV é criado automaticamente |
+| `kubectl get pvc` | Lista os PVCs; `STATUS Bound` = ligado a um disco |
+| `kubectl get pv` | Lista os discos (PV) criados pelo cluster |
+| `kubectl describe pv <nome-do-pv>` | Claim (dono), Reclaim Policy, Source |
+| `kubectl describe pvc <nome-do-pvc>` | Volume ligado, Used By (Pod que usa), Events |
+| `kubectl apply -f manifests/gravador-de-notas.yaml` | Pod que grava `/dados/nota.txt` no disco |
+| `kubectl apply -f manifests/leitor-de-notas.yaml` | Pod novo que monta o mesmo PVC |
+| `kubectl exec <pod> -- cat /dados/nota.txt` | Lê o arquivo (prova de que o dado sobreviveu ao Pod) |
+| `kubectl delete pod <pod>` | Remove o Pod; PVC e PV continuam |
+| `kubectl delete pvc <nome-do-pvc>` | Remove o PVC; com `reclaimPolicy: Delete`, o disco vai junto |
+
+## Troubleshooting de Pods
+
+| Comando | O que faz |
+|---|---|
+| `kubectl describe pod NOME` | Events: problemas ao redor do Pod (imagem, vaga, OOM, probe) |
+| `kubectl describe pod -l app=vitrine` | Mesmo, filtrando por label |
+| `kubectl get pods -l app=vitrine -w` | `-w` (*watch*) imprime cada mudança de status |
+| `kubectl get pods -l app=vitrine -o wide` | Mostra node e IP de cada Pod |
+| `kubectl logs NOME` | O que a aplicação escreveu |
+| `kubectl logs NOME --previous` | Log da execução anterior (Pod que reiniciou) |
+| `kubectl delete pod <nome-exato-do-pod>` | Remove um Pod; o Deployment cria outro |
+
+## Certificado de inspeção TLS no minikube
+
+Sintoma: node `NotReady` ou Pod em `ErrImagePull` / `ImagePullBackOff` com `x509: certificate signed by unknown authority`. Análise completa em [troubleshooting/tls-inspection](../troubleshooting/tls-inspection/).
+
+```bash
 kubectl get nodes
 kubectl get pods -n kube-system
 kubectl describe pod -n kube-system <nome-do-pod-com-erro>
-# Se o erro for "x509: certificate signed by unknown authority":
+
 minikube ssh
 openssl s_client -connect production.cloudfront.docker.com:443 -showcerts </dev/null 2>/dev/null | openssl x509 -outform PEM > /tmp/cloudflare.crt
 sudo cp /tmp/cloudflare.crt /usr/local/share/ca-certificates/cloudflare.crt
 sudo update-ca-certificates
 sudo systemctl restart containerd
 exit
+
 kubectl delete pod <nome-do-pod-com-erro>
-# Atencao: esse certificado se perde se o container do minikube for apagado
-# (minikube delete). Precisa ser reinstalado depois de cada delete.
+```
 
-# Fase 7 - Kubernetes - Modulo 2 (Rede) - Comandos praticados
-# Os YAMLs ficam em 07-kubernetes/yamls/
+| Comando | O que faz |
+|---|---|
+| `minikube ssh -- ls -l /usr/local/share/ca-certificates/` | Verifica se o certificado está instalado |
+| `minikube ssh -- "openssl x509 -in /usr/local/share/ca-certificates/cloudflare.crt -noout -subject -issuer -dates"` | Mostra subject, issuer e validade do certificado |
+| `minikube ssh -- sudo crictl pull busybox:1.36` | Testa o download de imagem direto no containerd |
+| `../troubleshooting/tls-inspection/conserta-cert.sh` | Automatiza captura, instalação e restart do containerd |
 
-## Ingress Controller
-minikube addons enable ingress          # instala o nginx como Ingress Controller (so no minikube)
-kubectl get pods -n ingress-nginx       # -n = namespace onde o controller fica
-kubectl get jobs -n ingress-nginx       # os 2 Jobs (admission-create e admission-patch) preparam o certificado do webhook
-kubectl logs job/ingress-nginx-admission-create -n ingress-nginx   # logs de um Job
+> O certificado se perde quando o container do minikube é recriado (`minikube delete`) e precisa ser reinstalado.
 
-## Apps de teste e regras do Ingress
-kubectl apply -f apps-teste.yaml        # cria app1 e app2 com seus Services (ClusterIP)
-kubectl apply -f ingress-teste.yaml     # cria as regras: /app1 -> svc-app1, /app2 -> svc-app2
-kubectl get ingress                     # mostra a classe, as regras e o ADDRESS
-kubectl get svc -n ingress-nginx        # tipo do Service do controller (NodePort no minikube)
-kubectl get namespaces                  # lista as "pastas" do cluster
+## AKS (referência, não executado)
 
-## Acesso no laboratorio (nao existe em producao)
-minikube tunnel                         # faz o papel do load balancer da nuvem; terminal fica preso
-minikube ip                             # IP do container do minikube
-curl http://192.168.49.2/app1           # testa a regra do Ingress pelo IP do minikube
-# Atencao: curl em localhost pode bater num nginx instalado no proprio WSL (rodape "nginx/1.24.0 (Ubuntu)")
-sudo ss -tlnp | grep ':80 '             # (exemplo) mostra quem esta escutando na porta 80
-
-## Contexto do kubectl
-kubectl config current-context          # qual cluster o kubectl esta usando agora
-kubectl cluster-info                    # endereco do kube-apiserver em uso
-minikube update-context                 # corrige o endereco do apiserver no kubeconfig (a porta muda a cada start)
-minikube start --force                  # liga o cluster existente quando se esta logado como root
-
-## Troubleshooting de Pods
-kubectl describe pod -l app=vitrine     # -l filtra por etiqueta; ver a secao Events no final
-kubectl get pods -l app=vitrine -w      # -w vigia e imprime cada mudanca de status
-kubectl get pods -l app=vitrine -o wide # mostra tambem o Node e o IP de cada Pod
-kubectl rollout restart deployment vitrine   # recria os Pods do Deployment, um a um
-kubectl delete pod <nome-exato-do-pod>  # apaga so um Pod; o Deployment cria outro
-kubectl delete -f arquivo.yaml          # apaga tudo que esta descrito no arquivo
-
-## Certificado do Cloudflare (repete a cada reinicio do minikube)
-minikube ssh -- ls -l /usr/local/share/ca-certificates/    # ver se o certificado esta instalado
-minikube ssh -- "openssl x509 -in /usr/local/share/ca-certificates/cloudflare.crt -noout -subject -issuer -dates"
-minikube ssh -- sudo crictl pull busybox:1.36    # testa o download de imagem direto no containerd
-./conserta-cert.sh                      # captura o certificado atual, instala e reinicia o containerd (script em yamls/)
-
-
-# Fase 7 - Kubernetes - Modulo 3 (Configuracao e saude) - Comandos praticados
-
-## ConfigMap e Secret
-kubectl apply -f config-teste.yaml      # cria o ConfigMap config-app e o Secret segredo-app
-kubectl get configmap config-app -o yaml    # valores em texto normal
-kubectl get secret segredo-app -o yaml      # valores em base64
-kubectl get configmap config-app -o jsonpath='{.data.DB_SERVER}'; echo   # extrai so um campo (sem base64)
-kubectl get secret segredo-app -o jsonpath='{.data.DB_PASSWORD}' | base64 -d; echo   # decodifica a senha
-# Erro NotFound: conferir tipo, nome e namespace (configmap e secret sao tipos diferentes)
-
-## Entrega para o Pod
-kubectl apply -f vitrine.yaml           # Deployment com envFrom (variaveis do ConfigMap e do Secret)
-kubectl exec deploy/vitrine -- env | grep DB_   # lista as variaveis recebidas pelo container
-# Pod ja rodando NAO percebe mudanca no ConfigMap: precisa de rollout restart ou delete pod
-kubectl apply -f vitrine-arq.yaml       # Deployment com o Secret montado como ARQUIVOS em /etc/segredos
-kubectl exec deploy/vitrine-arq -- ls /etc/segredos                  # cada chave vira um arquivo
-kubectl exec deploy/vitrine-arq -- cat /etc/segredos/DB_PASSWORD; echo   # conteudo do arquivo
-
-## Equivalentes por comando (exemplo, nao executados)
-kubectl create configmap ajustes-loja --from-literal=DB_SERVER=banco-prod --from-literal=DB_USER=app_loja
-kubectl create secret generic credenciais-loja --from-literal=DB_PASSWORD=senha123
-kubectl create deployment vitrine-cmd --image=busybox:1.36 -- sleep 3600
-kubectl set env deployment/vitrine-cmd --from=configmap/config-app   # liga o ConfigMap ao Deployment
-kubectl create deployment teste --image=nginx --dry-run=client -o yaml   # gera o esqueleto do YAML sem criar nada
-# YAML no Git e o padrao em empresa (versionamento, revisao, sem drift); comando serve para teste e diagnostico
-
-## Probes
-kubectl apply -f garcom.yaml            # readiness probe: cat /tmp/pronto
-kubectl exec deploy/garcom -- touch /tmp/pronto   # cria o arquivo: Pod passa de 0/1 para 1/1
-kubectl exec deploy/garcom -- rm /tmp/pronto      # apaga o arquivo: Pod volta para 0/1, sem reiniciar
-kubectl exec deploy/garcom -- cat /tmp/pronto; echo $?   # $? = codigo de saida (0 = sucesso)
-kubectl apply -f cozinheiro.yaml        # liveness probe: o app "trava" apagando /tmp/vivo apos 20s
-kubectl describe pod -l app=cozinheiro  # Events mostra "Liveness probe failed" e o reinicio
-kubectl scale deployment cozinheiro --replicas=0   # pausa o teste sem apagar o Deployment
-kubectl get pod -l app=garcom -o jsonpath='{.items[0].spec.containers[*].name}'; echo   # nomes dos containers do Pod
-
-# ===== HPA (Horizontal Pod Autoscaler) =====
-
-# --- Laboratório (minikube) ---
-minikube addons enable metrics-server      # liga o contador de CPU/memória (no AKS já vem pronto)
-
-# --- Consumo ---
-kubectl top pods -A                        # consumo de todos os pods, em todos os namespaces
-kubectl top pods -l app=api-catalogo       # consumo de cada pod de uma aplicação
-watch -n 5 kubectl top pods -l app=...     # mesmo comando, atualizando a cada 5 segundos
-
-# --- HPA ---
-kubectl autoscale deployment api-catalogo --name=escalador-catalogo --cpu-percent=50 --min=2 --max=8
-                                           # cria HPA por comando (não configura o behavior)
-kubectl get hpa escalador-catalogo         # estado: TARGETS (uso/meta) e REPLICAS
-kubectl get hpa escalador-catalogo --watch # acompanha ao vivo
-kubectl describe hpa escalador-catalogo    # ficha completa: Metrics, Conditions, Events
-
-# --- Gerador de carga ---
-kubectl run gerador-carga --rm -it --image=busybox:1.36 --restart=Never -- /bin/sh -c "while sleep 0.01; do wget -q -O- http://svc-catalogo; done"
-
-# --- Utilitários vistos ---
-kubectl get deploy,svc,hpa,pods -o name          # lista no formato tipo/nome
-kubectl rollout status deployment/api-catalogo   # acompanha troca gradual (rolling update)
-kubectl get rs                                   # ReplicaSets (moldes atual e antigos)
-kubectl apply -f arquivo.yaml --dry-run=client   # valida o YAML sem aplicar
-kubectl create deployment x --image=nginx --dry-run=client -o yaml   # gera esqueleto de YAML
-kubectl delete -f arquivo.yaml                   # apaga do cluster o que o arquivo descreve
-kubectl delete deployment app1 app2              # apaga vários pelo nome
-kubectl delete configmap/a secret/b ingress/c    # apaga tipos diferentes (tipo/nome)
-
-# --- Debug de pod ---
-kubectl describe pod NOME                  # Events: problemas ao redor do pod (imagem, vaga, OOM, probe)
-kubectl logs NOME                          # o que a aplicação escreveu
-kubectl logs NOME --previous               # log da execução anterior (pod que reiniciou)
-
-# --- nano ---
-nano -l arquivo.yaml                       # abre com número das linhas
-# Alt+U desfaz · Alt+E refaz · Ctrl+_ vai para a linha · Alt+P mostra espaços/tabs · Alt+/ vai para o fim
-# ~/.nanorc: set linenumbers / autoindent / tabstospaces / tabsize 2 / include "/usr/share/nano/*.nanorc"
-
-=== VOLUMES PERSISTENTES ===
-
-kubectl get storageclass
-  -> lista os tipos de disco que o cluster sabe entregar (setor de compras)
-
-kubectl apply -f pedido-disco-dados.yaml
-  -> cria o pedido de disco (PVC). O PV nasce sozinho
-
-kubectl get pvc
-  -> lista os pedidos. STATUS Bound = pedido ligado a um disco
-
-kubectl get pv
-  -> lista os discos registrados (PV), criados pelo cluster
-
-kubectl describe pv <nome-do-pv>
-  -> detalhes do disco: Claim (dono), Reclaim Policy, Source (onde está)
-
-kubectl describe pvc <nome-do-pvc>
-  -> detalhes do pedido: Volume ligado, Used By (pod que usa), Events
-
-kubectl exec <pod> -- cat /dados/nota.txt
-  -> lê um arquivo dentro do pod (prova que o dado sobreviveu)
-
-kubectl delete pod <pod>
-  -> apaga o pod. O PVC e o PV continuam
-
-kubectl delete pvc <nome-do-pvc>
-  -> apaga o pedido. Com reclaimPolicy Delete, o disco vai junto
-
-# ===== AKS (referência, não executados) =====
-
-az login                                         # entra na conta Azure (abre o navegador)
-az group create --name rg-teste-aks --location <regiao>
-                                                 # cria o grupo de recursos do teste (apagar o grupo = apagar tudo)
+```bash
+az login                                                   # autentica na Azure (abre o navegador)
+az group create --name rg-teste-aks --location <regiao>    # grupo de recursos do teste (apagar o grupo = apagar tudo)
 az aks create --resource-group rg-teste-aks --name aks-teste --node-count 1
-                                                 # cria o cluster com 1 node; o tamanho da VM é opção a conferir na documentação
+                                                           # cluster com 1 node; conferir o tamanho de VM na documentação
 az aks get-credentials --resource-group rg-teste-aks --name aks-teste
-                                                 # baixa o kubeconfig e liga o kubectl ao cluster
-kubectl get nodes                                # confere os nodes do AKS (mesmo comando do minikube)
+                                                           # baixa o kubeconfig e aponta o kubectl para o cluster
+kubectl get nodes                                          # mesmo comando usado no minikube
 az aks upgrade --resource-group rg-teste-aks --name aks-teste --kubernetes-version <versao>
-                                                 # atualiza a versão do cluster (Control Plane e nodes)
+                                                           # atualiza a versão (Control Plane e nodes)
 az aks update --resource-group rg-teste-aks --name aks-teste --auto-upgrade-channel stable
-                                                 # liga o canal de atualização automática (none, patch, stable, rapid)
-az group delete --name rg-teste-aks              # LIMPEZA: apaga o grupo e tudo dentro (evita gasto esquecido)
-# Antes de usar: conferir os parâmetros na documentação atual, porque o az muda com as versões
+                                                           # canal de atualização automática (none, patch, stable, rapid)
+az group delete --name rg-teste-aks                        # limpeza: apaga o grupo e tudo dentro (evita custo esquecido)
+```
+
+> Conferir os parâmetros na documentação atual antes de usar: a CLI `az` muda entre versões.
+
+## Utilitários de edição (nano)
+
+| Comando / atalho | O que faz |
+|---|---|
+| `nano -l arquivo.yaml` | Abre com número das linhas (`-l`) |
+| `Alt+U` / `Alt+E` | Desfaz / refaz |
+| `Ctrl+_` | Vai para uma linha |
+| `Alt+P` | Mostra espaços e tabs (essencial para YAML) |
+| `Alt+/` | Vai para o fim do arquivo |
+
+`~/.nanorc` recomendado para YAML:
+
+```
+set linenumbers
+set autoindent
+set tabstospaces
+set tabsize 2
+include "/usr/share/nano/*.nanorc"
+```
