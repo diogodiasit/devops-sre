@@ -2,8 +2,8 @@
 
 **Personagem:** 🧝‍♂️ Diogo Dias, o Elfo Mago da Tecnologia
 **Nível atual:** 5 — Automatizador de Pipelines
-**XP total:** 850
-**Próximo nível:** 6 — Mestre da Nuvem (faltam 150 XP)
+**XP total:** 990
+**Próximo nível:** 6 — Mestre da Nuvem (faltam 10 XP)
 
 ---
 
@@ -30,7 +30,7 @@
 - [x] Fase 5 — CI/CD (pasta: 05-cicd) — GitHub Actions, PR automatizado, branch protection, build e publicação automática de imagem Docker
 - [x] Fase 6 — Azure DevOps (pasta: 06-azure-devops) — Azure Repos, Pipelines, Service Connections, Branch Policies
 - [x] Fase 7 — Kubernetes (pasta: 07-kubernetes) — Deployment, Service, Ingress, ConfigMap e Secret, probes, HPA, volumes persistentes, namespaces e RBAC (conceito), AKS (conceito)
-- [ ] Fase 8 — Terraform
+- [x] Fase 8 — Terraform (pasta: 08-terraform) — IaC, providers, variables e outputs, state, ciclo init/validate/plan/apply/destroy, fluxo de PR com esteira de IaC; laboratório local praticado e código Azure (azurerm) validado, sem apply (crédito expirado)
 - [ ] Fase 9 — Monitoramento
 - [ ] Fase 10 (chefão final) — Projetos de entrevista real, incluindo migração on-premise → Azure
 
@@ -67,3 +67,10 @@
 - Lógica: AKS = Kubernetes com o Control Plane gerenciado pela Azure; eu cuido de nodes, rede, segurança, atualizações, custo e aplicações
 - Comparação: sem AKS (self-managed) eu monto e mantenho o Control Plane, o etcd, os certificados e as atualizações
 - Extras vistos: responsabilidade compartilhada, SaaS x PaaS x IaaS, Standard x Automatic x Fleet Manager, AKS x Container Apps x ACI, atualizações (canais, nodes, imagem), custo e conta de estudante
+
+### Terraform ✅ (laboratório local; Azure só código validado)
+- Lógica: Terraform = infraestrutura em código; descrevo o que quero (declarativo); provider = tradutor que fala com a plataforma; state = comanda que liga cada item do código ao recurso real e nunca vai pro Git
+- Prática: instalei Terraform e Azure CLI no WSL; laboratório local (providers local e random) com init, validate, plan, apply e state (3 recursos); laboratório Azure (Resource Group, VNet, Storage Account) escrito e validado com `terraform validate`
+- Debug: `az login --use-device-code` com código expirado; subscription em estado Warned (crédito de teste acabou) não cria recursos e o Azure CLI a esconde da lista (`az account list --all`)
+- Regras: plan não altera nada; apply só depois de revisão; referência TIPO.APELIDO.CAMPO cria dependência entre recursos; state nunca editado na mão
+- Extras vistos: fluxo real (branch, PR com plan, merge, apply com aprovação via Environment), gatilhos push e pull_request, drift, Bicep x Terraform x Ansible, OpenTofu, crédito do Azure (US$ 200 em 30 dias) e Azure for Students
