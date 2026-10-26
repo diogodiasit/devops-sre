@@ -1,7 +1,7 @@
 name: Deploy - Publicar imagem no Docker Hub
 
-# Esse workflow só dispara quando algo é enviado (push) direto pra main —
-# e na prática, isso só acontece via merge de PR, já que temos branch protection
+# Dispara em push na main — na prática, só via merge de PR,
+# porque a main tem branch protection
 on:
   push:
     branches:
@@ -9,29 +9,27 @@ on:
 
 jobs:
   publicar:
-    runs-on: ubuntu-latest   # mesma "máquina descartável" de sempre
+    runs-on: ubuntu-latest   # runner temporário, destruído ao final do job
     steps:
-      # Passo 1: baixar o código da main pro runner (mesma ideia de sempre)
+      # Passo 1: baixar o código da main para o runner
       - name: Baixar o código do repositório
         uses: actions/checkout@v4
 
-      # Passo 2: fazer login no Docker Hub usando os secrets que você criou
-      # essa action pronta (docker/login-action) faz o "docker login" por trás dos panos,
-      # usando os dois secrets como usuário e senha
+      # Passo 2: login no Docker Hub com os secrets do repositório
+      # (docker/login-action executa o "docker login" usando usuário e token)
       - name: Login no Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Passo 3: buildar a imagem de novo (mesmo comando do outro workflow)
-      # o nome da imagem já vem com seu usuário do Docker Hub na frente,
-      # porque é assim que o Docker Hub sabe em qual "gaveta" (repositório) publicar
+      # Passo 3: build da imagem (mesmo comando do workflow de testes)
+      # o prefixo com o usuário do Docker Hub define em qual repositório publicar
       - name: Buildar a imagem
         run: |
-          cd projeto-agendamento/app
+          cd cicd/projeto-agendamento/app
           docker build -t diogojdiasit/agendamento-barbearia:latest .
 
-      # Passo 4: publicar (enviar) a imagem pro Docker Hub
+      # Passo 4: publicar a imagem no Docker Hub
       - name: Publicar a imagem no Docker Hub
         run: docker push diogojdiasit/agendamento-barbearia:latest
