@@ -1,58 +1,72 @@
-# Comandos praticados - Fase 04 Docker
+# Docker — Comandos
 
-## Verificar instalação
-docker --version
+Referência dos comandos usados nos labs de containers. O projeto prático está em [webserver/](./webserver/).
 
-## Rodar um container simples (baixa a imagem se não tiver)
-docker run hello-world
+## Instalação e teste
 
-## Rodar um servidor web real, em segundo plano, com porta mapeada
-docker run -d -p 8080:80 nginx
-# -d = detached, roda em segundo plano
-# -p 8080:80 = mapeia porta 8080 da máquina para porta 80 do container
+| Comando | O que faz |
+|---|---|
+| `docker --version` | Mostra a versão instalada |
+| `docker run hello-world` | Roda um container de teste (baixa a imagem se ela não existir localmente) |
 
-## Ver containers em execução agora
-docker ps
+## Executar containers
 
-## Ver TODOS os containers, incluindo parados
-docker ps -a
+| Comando | O que faz |
+|---|---|
+| `docker run -d -p 8080:80 nginx` | Sobe um nginx em segundo plano (`-d` = *detached*) mapeando a porta 8080 do host para a 80 do container (`-p host:container`) |
+| `docker run -d --restart unless-stopped -p 8080:80 nginx` | Igual, com política de reinício automático (ver [conceitos](./conceitos.md#políticas-de-restart)) |
+| `docker run -d -p 8081:80 meu-webserver` | Roda a imagem própria em outra porta |
+| `docker exec -it <CONTAINER_ID> bash` | Abre um shell dentro de um container em execução (`-i` = interativo, `-t` = terminal) |
 
-## Entrar dentro de um container rodando (tipo SSH, mas local)
-docker exec -it <CONTAINER_ID> bash
+## Ciclo de vida
 
-## Ver as imagens já baixadas/construídas na máquina
-docker images
+| Comando | O que faz |
+|---|---|
+| `docker ps` | Containers em execução |
+| `docker ps -a` | Todos os containers, inclusive os parados (`-a` = *all*) |
+| `docker start <CONTAINER_ID>` | Religa um container existente e parado, mantendo a configuração (inclusive a porta) |
+| `docker stop <CONTAINER_ID>` | Para um container em execução |
+| `docker rm <CONTAINER_ID>` | Remove um container (precisa estar parado) |
 
-## Religar um container que já existe, mas está parado (mantém config, incluindo porta)
-docker start <CONTAINER_ID>
+**`run` x `start`**
 
-## Parar um container em execução
-docker stop <CONTAINER_ID>
+- `docker run` cria um container **novo** (porta e opções são definidas de novo).
+- `docker start` religa um container **existente**, com a configuração anterior.
+- Um container parado (`Exited`) ainda existe; um container removido (`rm`) deixa de existir.
 
-## Remover um container (só funciona se estiver parado)
-docker rm <CONTAINER_ID>
+## Imagens
 
-## Construir uma imagem própria a partir de um Dockerfile
-docker build -t meu-webserver .
-# -t = nomeia a imagem
-# . = usa a pasta atual como contexto de build
+| Comando | O que faz |
+|---|---|
+| `docker images` | Lista as imagens locais |
+| `docker build -t meu-webserver .` | Constrói uma imagem a partir do Dockerfile (`-t` = nome/tag; `.` = pasta atual como contexto de build) |
 
-## Rodar a imagem própria numa porta diferente
-docker run -d -p 8081:80 meu-webserver
+Dockerfile mínimo usado no lab:
 
-## Conceito-chave: Dockerfile (a receita)
-# FROM nginx:alpine -> parte de uma imagem base já pronta
-# COPY index.html /usr/share/nginx/html/index.html -> copia arquivo local para dentro da imagem
-# Arquivos usados no COPY precisam estar dentro do "contexto de build"
-# (a pasta onde o build é rodado, incluindo subpastas - nunca fora dela, tipo ../)
+```dockerfile
+# Parte de uma imagem base pronta
+FROM nginx:alpine
+# Copia o arquivo local para dentro da imagem
+COPY index.html /usr/share/nginx/html/index.html
+```
 
-## Diferença importante
-# docker run = cria um container NOVO (porta precisa ser escolhida de novo)
-# docker start = religa um container EXISTENTE (mantém a config de antes)
-# container parado (Exited) ainda existe; container removido (rm) some de vez
+> Os arquivos usados em `COPY` precisam estar dentro do **contexto de build** (a pasta do build e suas subpastas — nunca fora dela, como `../`).
 
-## Ver logs de um container em tempo real
-docker logs -f <nome_ou_id_do_container>
-# -f = follow, mostra em tempo real conforme acontece
-# Equivalente ao journalctl -f, mas para dentro de containers
-# (containers geralmente nao rodam systemd, entao journalctl nao funciona la dentro)
+## Logs
+
+| Comando | O que faz |
+|---|---|
+| `docker logs -f <nome_ou_id>` | Acompanha os logs do container em tempo real (`-f` = *follow*) |
+
+> Equivalente ao `journalctl -f`, mas para containers. Containers normalmente não rodam systemd, então `journalctl` não funciona dentro deles.
+
+## Docker Compose
+
+Arquivo do lab: [docker-compose.yml](./docker-compose.yml) — sobe o site (build local) e um PostgreSQL com volume persistente.
+
+```bash
+cp .env.example .env      # define a senha do banco fora do arquivo versionado
+docker compose up -d      # sobe todos os serviços em segundo plano (-d = detached)
+docker compose ps         # lista os serviços do projeto
+docker compose down       # derruba os serviços (o volume nomeado é mantido)
+```

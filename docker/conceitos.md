@@ -1,91 +1,76 @@
-# Conceitos avançados - Fase 04 Docker
+# Docker — Conceitos
 
-## RUN vs CMD
-- RUN: executa durante o BUILD da imagem. Roda uma vez, fica gravado permanentemente.
-  Usado para instalar dependências, ajustar permissões, etc.
-- CMD: executa quando o container LIGA (docker run). Roda toda vez.
-  É o processo principal que mantém o container vivo.
-- Exemplo real (do nginx): CMD ["nginx", "-g", "daemon off;"]
-  "daemon off" mantém o Nginx em primeiro plano - necessário porque o container
-  morre no instante em que o processo principal (CMD) termina.
+Como imagens e containers se comportam, e como isso orienta o troubleshooting em produção.
 
-## Politicas de restart
+## RUN x CMD
+
+- **RUN:** executa durante o **build** da imagem. Roda uma vez e o resultado fica gravado numa camada. Usado para instalar dependências, ajustar permissões etc.
+- **CMD:** executa quando o container **inicia** (`docker run`). Roda toda vez; é o processo principal que mantém o container vivo.
+- Exemplo (imagem oficial do nginx): `CMD ["nginx", "-g", "daemon off;"]`. O `daemon off` mantém o nginx em primeiro plano — necessário porque o container termina no instante em que o processo principal termina.
+
+## Políticas de restart
+
+```bash
 docker run -d --restart unless-stopped -p 8080:80 nginx
-- no = nunca reinicia (padrão)
-- always = reinicia sempre, até depois de reiniciar a máquina
-- unless-stopped = reinicia sempre, a menos que eu tenha parado manualmente
-- on-failure = só reinicia se terminou com erro
+```
 
-## Camada gravável do container (writable layer)
-- A imagem é composta de camadas FIXAS, somente leitura.
-- Quando um container liga, o Docker adiciona uma camada fina e GRAVÁVEL em cima.
-- Mudanças manuais feitas dentro do container (ex: editar um arquivo na mão)
-  ficam SÓ nessa camada gravável, não na imagem.
+| Política | Comportamento |
+|---|---|
+| `no` | Nunca reinicia (padrão) |
+| `always` | Sempre reinicia, inclusive após reboot do host |
+| `unless-stopped` | Sempre reinicia, exceto se tiver sido parado manualmente |
+| `on-failure` | Só reinicia se o processo terminar com erro |
 
-## O que sobrevive e o que não sobrevive
-- docker start (religar o MESMO container que só estava parado):
-  a camada gravável continua existindo -> mudanças manuais sobrevivem
-- Container removido e recriado a partir da imagem (ex: Kubernetes substituindo
-  um container com problema):
-  a camada gravável é descartada -> mudanças manuais somem, volta ao estado da imagem
+## Camada gravável (writable layer)
 
-## Filosofia: infraestrutura imutável ("cattle, not pets")
-- Servidor tradicional (VM, físico) = "pet": você cuida dele, corrige direto nele,
-  a correção fica.
-- Container = "cattle" (gado): é descartável por natureza. Corrigir "no lugar"
-  não é confiável, porque o container pode ser substituído a qualquer momento.
-- Prática correta: NUNCA corrigir de forma permanente dentro de um container rodando.
-  Corrigir na ORIGEM (código-fonte ou configuração), gerar uma imagem nova,
-  e deixar essa imagem nova substituir o container antigo.
+- Uma imagem é composta de camadas **somente leitura**.
+- Ao iniciar um container, o Docker adiciona uma camada fina e **gravável** por cima.
+- Alterações manuais feitas dentro do container ficam só nessa camada, não na imagem.
 
-## Fluxo correto de troubleshooting em containers
-1. Diagnosticar dentro do container rodando (docker exec, docker stats, logs) - OK fazer isso
-2. Identificar ONDE está a causa real:
-   - Código da aplicação -> repassar para o time de dev, gerar imagem nova depois
-   - Dockerfile (dependência, variável, permissão) -> corrigir a receita
-   - Configuração de execução (docker run/compose: limite de recurso, porta,
-     variável de ambiente) -> ajustar o compose/comando de run
-3. Pode aplicar correção temporária direto no container só para estancar
-   o problema, sabendo que ela NÃO é permanente
-4. Corrigir na origem certa, gerar imagem nova (docker build)
-5. Substituir o container antigo pelo novo
+### O que sobrevive e o que não sobrevive
 
-## Exemplos: problema de imagem vs problema de código
+- `docker start` (religar o **mesmo** container parado): a camada gravável continua → alterações manuais sobrevivem.
+- Container removido e recriado a partir da imagem (ex.: Kubernetes substituindo um container com problema): a camada gravável é descartada → o estado volta ao da imagem.
 
-Problema de IMAGEM (ambiente):
-- Versão errada de dependência instalada
-- Variável de ambiente faltando
-- Pacote do sistema faltando (ex: falta uma lib)
-- Limite de recurso não configurado (sem --memory)
-- Porta errada exposta
-- Permissão de arquivo errada (ex: esqueceu RUN chmod)
-Sinal: geralmente aparece JÁ NA INICIALIZAÇÃO (arquivo não encontrado, permission denied)
+## Infraestrutura imutável ("cattle, not pets")
 
-Problema de CÓDIGO (aplicação):
-- Vazamento de memória
-- Query de banco mal otimizada
-- Erro de lógica
-- Falta de tratamento de erro
-- Vulnerabilidade de segurança (ex: SQL injection)
-Sinal: geralmente o container liga normal, funciona um tempo, e o problema
-aparece SOB USO (não é "não iniciou", é "começou e se comportou errado depois")
+- Servidor tradicional (VM, físico) = **pet**: é cuidado individualmente, corrigido no lugar, e a correção permanece.
+- Container = **cattle**: descartável por natureza. Corrigir "no lugar" não é confiável, porque o container pode ser substituído a qualquer momento.
+- **Prática correta:** nunca corrigir de forma permanente dentro de um container em execução. Corrigir na **origem** (código ou configuração), gerar uma imagem nova e substituir o container antigo.
 
-Pergunta rápida para diferenciar:
-"Isso aconteceria mesmo se eu rodasse essa aplicação direto na minha máquina,
-sem Docker nenhum?"
-- Sim -> problema de código
-- Não (só acontece por causa de como o container foi montado/configurado) -> problema de imagem
+## Fluxo de troubleshooting em containers
+
+1. Diagnosticar dentro do container em execução (`docker exec`, `docker stats`, `docker logs`).
+2. Identificar **onde** está a causa:
+   - código da aplicação → encaminhar ao time de desenvolvimento e gerar imagem nova;
+   - Dockerfile (dependência, variável, permissão) → corrigir a receita;
+   - configuração de execução (`docker run`/compose: limite de recurso, porta, variável de ambiente) → ajustar o compose ou o comando.
+3. Se necessário, aplicar correção temporária no container para estancar o incidente, sabendo que ela **não** é permanente.
+4. Corrigir na origem e gerar imagem nova (`docker build`).
+5. Substituir o container antigo pelo novo.
+
+## Problema de imagem x problema de código
+
+| | Problema de **imagem** (ambiente) | Problema de **código** (aplicação) |
+|---|---|---|
+| Exemplos | Versão errada de dependência; variável de ambiente faltando; pacote/lib do sistema ausente; limite de recurso não configurado (sem `--memory`); porta errada exposta; permissão de arquivo errada (faltou `RUN chmod`) | Vazamento de memória; query mal otimizada; erro de lógica; falta de tratamento de erro; vulnerabilidade (ex.: SQL injection) |
+| Sinal típico | Falha **já na inicialização** (arquivo não encontrado, permission denied) | O container sobe normalmente e o problema aparece **sob uso** |
+
+Pergunta rápida para diferenciar: *"isso aconteceria se a aplicação rodasse direto na máquina, sem Docker?"*
+
+- Sim → problema de código.
+- Não (só acontece pela forma como o container foi montado/configurado) → problema de imagem.
 
 ## Permissões no Dockerfile
-- RUN chmod 644 /caminho/arquivo   (ajusta depois de copiar)
-- COPY --chown=usuario:grupo origem destino   (já ajusta dono na hora de copiar)
-- USER nome_usuario   (define que o CMD final roda como esse usuário, não como root -
-  boa prática de segurança, limita o estrago em caso de invasão)
 
-## Divisão de responsabilidade (resumo para entrevista)
-- DevOps/SRE é dono do "COMO isso roda": ambiente, dependências, permissões,
-  recursos, configuração de deploy (tudo que vive no Dockerfile/compose).
-- Time de Dev é dono do "O QUE isso faz": lógica de negócio, regras da aplicação,
-  bugs de código.
-- DevOps/SRE diagnostica problemas em produção e direciona a correção para o
-  lugar certo - não tenta corrigir lógica de aplicação sozinho.
+| Instrução | Uso |
+|---|---|
+| `RUN chmod 644 /caminho/arquivo` | Ajusta a permissão depois de copiar |
+| `COPY --chown=usuario:grupo origem destino` | Já define o dono no momento da cópia |
+| `USER nome_usuario` | Faz o processo final rodar sem root — boa prática que limita o impacto de uma invasão |
+
+## Divisão de responsabilidades
+
+- **DevOps/SRE** é dono do "**como** isso roda": ambiente, dependências, permissões, recursos e configuração de deploy (tudo que vive no Dockerfile/compose).
+- **Desenvolvimento** é dono do "**o que** isso faz": regras de negócio e bugs de código.
+- Em produção, DevOps/SRE diagnostica o problema e direciona a correção para o lugar certo, sem tentar corrigir a lógica da aplicação sozinho.

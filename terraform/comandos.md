@@ -1,16 +1,38 @@
-FASE 8 - TERRAFORM: COMANDOS
+# Terraform — Comandos
 
-terraform -version      mostra a versão instalada
-terraform init          baixa os providers do providers.tf (roda no começo ou ao trocar de provider)
-terraform validate      confere a escrita e a coerência do código, sem falar com a nuvem
-terraform fmt           arruma o estilo do código (com -check só verifica)
-terraform plan          mostra o que vai ser criado (+), alterado (~) ou destruído (-), sem executar
-terraform apply         executa o plano (pede yes)
-terraform destroy       apaga tudo que o código criou
-terraform state list    lista os recursos anotados no state
-terraform show          mostra o state de forma legível
+Referência dos comandos usados nos labs [lab-local](./lab-local/) e [lab-azure](./lab-azure/).
 
-az login --use-device-code       login no Azure por código (laboratório no WSL)
-az account show                  mostra a subscription ativa
-az account list --all            lista as subscriptions, inclusive as que não estão Enabled
-export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)    informa ao azurerm qual subscription usar
+## Ciclo de vida
+
+| Comando | O que faz |
+|---|---|
+| `terraform -version` | Mostra a versão instalada |
+| `terraform init` | Baixa os providers declarados em `providers.tf` (no início do projeto ou ao trocar de provider) e gera o `.terraform.lock.hcl` |
+| `terraform validate` | Confere sintaxe e coerência do código, sem falar com a nuvem |
+| `terraform fmt` | Formata o código no estilo padrão (`-check` só verifica, sem alterar) |
+| `terraform plan` | Mostra o que será criado (`+`), alterado (`~`) ou destruído (`-`), sem executar |
+| `terraform apply` | Executa o plano (pede confirmação `yes`) |
+| `terraform destroy` | Remove tudo que o código criou |
+
+## State
+
+| Comando | O que faz |
+|---|---|
+| `terraform state list` | Lista os recursos registrados no state |
+| `terraform show` | Exibe o state de forma legível |
+
+## Azure CLI (autenticação do provider azurerm)
+
+| Comando | O que faz |
+|---|---|
+| `az login --use-device-code` | Login por código de dispositivo — útil no WSL, onde o navegador não abre direto |
+| `az account show` | Mostra a subscription ativa |
+| `az account list --all` | Lista as subscriptions, inclusive as que não estão `Enabled` (`--all`) |
+
+```bash
+export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+```
+
+- Informa ao provider `azurerm` qual subscription usar.
+- `--query id`: filtra o campo `id` (JMESPath); `-o tsv`: saída em texto puro, sem aspas.
+- `$( ... )`: substitui pelo resultado do comando; `export` disponibiliza a variável para o Terraform.

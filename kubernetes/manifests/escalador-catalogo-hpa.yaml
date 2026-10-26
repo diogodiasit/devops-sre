@@ -30,4 +30,4 @@ spec:
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300  # espera 5 min de calma antes de remover pods
-                                       # (300 já é o padrão; deixamos explícito para aprender)
+                                       # (300 já é o padrão; explícito para documentar o comportamento)

@@ -1,333 +1,348 @@
-# Fase 7 - Kubernetes - Modulo 1 (Deploy) - Conceitos
+# Kubernetes — Conceitos
 
-## Hierarquia basica
-- Pod: menor unidade gerenciada pelo Kubernetes, geralmente 1 container
-- Node: uma maquina (real ou simulada) onde Pods rodam
-- Cluster: o conjunto de Nodes administrados por um mesmo Control Plane
-  (um Cluster pode ter so 1 Node, nao precisa de varios)
+Arquitetura, rede, configuração, saúde, escala, armazenamento, segurança e AKS.
 
-## Deployment
-- Um Pod sozinho e fragil: se morre, ninguem sobe outro no lugar
-- Deployment garante uma quantidade fixa de replicas sempre rodando
-- Se um Pod morre, o Deployment sobe outro automaticamente
-- kubectl scale muda o numero de replicas (numero final desejado, nao "adicionar")
-- Nomes de Pods sao gerados pelo Deployment: <deployment>-<hash-replicaset>-<sufixo-aleatorio>
-  Voce nunca escolhe o nome de Pods de um Deployment
+**Índice:** [Arquitetura](#arquitetura) · [Deployment e Service](#deployment-labels-e-service) · [Rede e Ingress](#rede-e-ingress) · [Configuração](#configmap-e-secret) · [Probes](#probes) · [HPA](#hpa-horizontal-pod-autoscaler) · [Volumes](#volumes-persistentes) · [Namespaces e RBAC](#namespaces-e-rbac) · [AKS](#aks-azure-kubernetes-service) · [YAML](#boas-práticas-de-yaml)
 
-## Etiquetas (labels) e Service
-- Toda etiqueta e um par chave=valor. Ex: app=meu-app
-  "app" e a chave (convencao do kubectl create), "meu-app" e o valor
-- O Deployment coloca a etiqueta em cada Pod ao criar
-- O Service NAO gerencia Pods (quem gerencia e o Deployment)
-- O Service so GUARDA UMA REGRA (selector) e roteia para Pods que combinam com ela
-- kubectl expose copia a regra do Deployment para o Service automaticamente
-- Em YAML, o selector e escrito na mao, nao e copiado sozinho
-- O IP de um Pod muda quando ele reinicia; o IP do Service (ClusterIP) e fixo
-- Nome do Deployment, nome dos Pods e nome do Service sao independentes -
-  o que liga tudo e a etiqueta, nao o nome
+---
 
-## Portas de um Service
-- --port: porta em que o Service recebe conexoes
-- --target-port: porta dos Pods para onde ele entrega (se omitido, copia --port)
-- Quem decide em que porta o Pod escuta e a aplicacao dentro da imagem
-  (o Service nao abre porta nenhuma no Pod, so direciona trafego)
-- Um Service pode ter varias portas ao mesmo tempo (cada uma com seu name, port, targetPort)
-  util quando uma aplicacao responde em mais de uma porta (ex: HTTP e metricas)
+## Arquitetura
 
-## kubectl port-forward (ferramenta de teste, nao de producao)
-- Cria um tunel entre uma porta local (WSL) e um Pod dentro do cluster
-- Usa o Service so para ESCOLHER um Pod; depois disso vai direto nele
-  (nao passa pelo balanceamento real do Service)
-- Caminho: navegador -> Windows (repassa) -> WSL -> kubectl (traduz a porta)
-  -> kube-apiserver -> kubelet do Node -> Pod
-- O tunel so existe enquanto o comando esta rodando; fechar o terminal derruba ele
+### Hierarquia básica
 
-## DNS interno (como Pods se acham de verdade, sem tunel)
-- Um Pod pode chamar outro usando so o NOME do Service (nao IP)
-- O CoreDNS (Pod do proprio kube-system) traduz esse nome para o IP fixo do Service
-- Esse e o caminho real de producao: Pod -> nome do Service -> kube-proxy reparte
-  entre os Pods vivos que tem a etiqueta certa
+- **Pod:** menor unidade gerenciada pelo Kubernetes, geralmente com 1 container.
+- **Node:** uma máquina (real ou virtual) onde os Pods rodam.
+- **Cluster:** conjunto de nodes administrados por um mesmo Control Plane (pode ter um único node).
 
-## Imperativo vs declarativo (YAML)
-- Comandos (create, expose, scale, set image) = imperativo: "faça esta ação agora"
-- YAML + kubectl apply -f = declarativo: "descrevo como quero que fique"
-- apply pode ser rodado varias vezes sem problema (so aplica o que mudou)
-- Forma usada em empresa: YAML versionado no Git, aplicado via pipeline (CI/CD)
+### Componentes internos
 
-## Rolling update (trocar versao sem downtime)
-- kubectl set image troca a imagem de um container dentro do Deployment
-- A troca e gradual: sobe 1 Pod novo, espera ficar saudavel, so entao derruba 1 antigo
-- Em nenhum momento os Pods ficam todos fora do ar ao mesmo tempo
-- kubectl rollout status acompanha o progresso ate terminar
+- O próprio Kubernetes roda como Pods no namespace `kube-system`: etcd, kube-apiserver, kube-scheduler, kube-controller-manager, kube-proxy, CoreDNS e o CNI (ex.: kindnet).
+- **kubelet** e **containerd** **não** são Pods: são processos no sistema do node, responsáveis por criar e gerenciar todos os Pods (inclusive os do sistema).
+- Control Plane e node são papéis **lógicos**; no minikube, os dois rodam no mesmo container (kicbase).
+- Nenhum componente fala direto com outro: todos conversam apenas com o **kube-apiserver**.
 
-## Rollback (voltar atras)
-- kubectl rollout undo volta para a versao anterior, usando o mesmo mecanismo gradual
-- kubectl rollout history lista as versoes anteriores do Deployment
-- Se o Deployment foi criado via apply, o undo nao atualiza a "ultima config aplicada" -
-  um proximo apply pode sobrescrever o rollback com o que estiver no arquivo YAML
+Fluxo de qualquer mudança:
 
-## Estrutura interna do Kubernetes (descoberta pratica)
-- O proprio Kubernetes roda como Pods, no namespace kube-system
-  (etcd, kube-apiserver, kube-scheduler, kube-controller-manager, kube-proxy,
-  coredns, o CNI como kindnet) - ele usa a propria estrutura de Pods para se administrar
-- kubelet e containerd NAO sao Pods - sao processos rodando direto no sistema do Node,
-  responsaveis por criar e gerenciar todos os Pods (incluindo os do proprio sistema)
-- Control Plane e Node sao papeis LOGICOS, nao camadas fisicas separadas -
-  no Minikube, os dois rodam dentro do mesmo container (kicbase)
-- Fluxo de qualquer mudanca: kubectl -> kube-apiserver -> etcd (grava o estado desejado)
-  -> controller-manager (nota diferenca) -> scheduler (decide o Node) -> kubelet
-  (executa de verdade) -> kube-proxy (ajusta rede do Service)
-- Nenhum componente fala direto com outro - todos só conversam com o kube-apiserver
+```
+kubectl → kube-apiserver → etcd (grava o estado desejado)
+        → controller-manager (detecta a diferença) → scheduler (escolhe o node)
+        → kubelet (executa) → kube-proxy (ajusta a rede do Service)
+```
 
-## Minikube
-- E uma aplicacao (nao so uma imagem Docker) que automatiza o processo de subir
-  um cluster Kubernetes completo dentro de 1 container Docker
-- minikube start faz, por baixo, um docker run (1a vez) ou docker start (container
-  ja existe) - e tambem configura kubelet, CNI e kubeconfig automaticamente
-- kubectl e uma ferramenta separada do Minikube - e so quem "fala" com qualquer
-  cluster (local ou na nuvem), lendo o arquivo ~/.kube/config
-- Container do Minikube parado nao apaga nada - minikube start so religa ele
-- minikube delete apaga o container inteiro, incluindo certificados instalados
-  manualmente dentro dele (ver troubleshooting no comandos.txt)
+### Minikube
 
-## AKS (Azure Kubernetes Service)
-- Mesma logica do Azure DevOps: a Microsoft gerencia o Control Plane,
-  o time so cuida dos Nodes e das aplicacoes
-- Comandos (kubectl) sao os mesmos usados no Minikube - o que muda e quem
-  administra o Control Plane por tras
-- Mercado prefere Kubernetes gerenciado (AKS/EKS/GKE) a self-managed,
-  exceto em cenarios on-premise ou empresas com time de infra dedicado
+- Aplicação que automatiza a criação de um cluster completo dentro de 1 container Docker.
+- `minikube start` executa por baixo um `docker run` (1ª vez) ou `docker start` (container existente) e configura kubelet, CNI e kubeconfig.
+- O **kubectl** é uma ferramenta separada: é o cliente que fala com qualquer cluster (local ou na nuvem), lendo `~/.kube/config`.
+- Container do minikube parado não perde nada; `minikube delete` apaga tudo, inclusive certificados instalados manualmente.
 
-# Fase 7 - Kubernetes - Modulo 2 (Rede) - Conceitos
+### Pod x container x Deployment
 
-## DNS interno
-- Dentro do cluster, o nome do Service e resolvido pelo DNS interno (CoreDNS)
-- Mesmo namespace: nome curto (svc-banco)
-- Outro namespace: nome.namespace (svc-banco.dados)
-- Nome completo: svc-banco.dados.svc.cluster.local
-- Apontar sempre para o NOME do Service, nunca para IP de Pod (o IP muda)
+- O Pod é a casa, o container é o morador. Quase sempre 1 container por Pod.
+- O Pod é descartável: o Kubernetes não o conserta, substitui por outro.
+- **O que reinicia o container:** erro na aplicação, OOMKilled (falta de memória), falha de liveness.
+- **O que substitui o Pod:** delete, queda do node, eviction, rolling update, redução de escala.
+- Comandos que alteram o Deployment (`rollout restart`, `scale`) agem sobre todos os Pods.
+- `exec` e `logs` com `deploy/nome` escolhem **um** Pod sem controle de qual; para um Pod específico, use o nome exato.
 
-## Ingress
-- Ingress (YAML) so guarda REGRAS (caminho -> Service). Nao executa nada
-- Ingress Controller (Pod com nginx) e quem executa as regras. Sem controller, nada funciona
-- ingressClassName diz qual controller le aquela regra
-- Service trabalha na camada 4 (IP e porta); Ingress na camada 7 (host e caminho)
-- Cadeia completa: DNS -> IP do load balancer -> Node -> controller -> Service -> Pod
-- O Control Plane guarda as regras e fica FORA do caminho do trafego
-- O controller e um Pod comum: o scheduler escolhe o Node (da para forcar com
-  nodeSelector, affinity ou taints). Em producao: 2 ou mais replicas em Nodes diferentes
-- O Ingress cuida so da porta de entrada; as URLs internas (/pisos/carvalho) sao da aplicacao
-- pathType Prefix: vale para o caminho e tudo que comeca com ele. A regra mais especifica vence
-- O nome do caminho e o nome do Service sao independentes: a regra liga os dois
-- 503 quase sempre = Service sem Pod pronto (etiqueta errada ou Pod nao pronto)
-- 404 = caminho sem regra, ou o app nao conhece aquele caminho
-- ingress-nginx foi anunciado como aposentado (manutencao ate marco/2026);
-  o sucessor oficial e o Gateway API (verificar a situacao atual)
+---
 
-## Saida do Pod para a rede externa (ex: banco na nuvem)
-- Caminho: Pod -> Node -> rede da nuvem (VNet) -> destino
-- O Node faz NAT: troca o IP de origem pelo dele e anota a conexao numa tabela;
-  na volta, usa a tabela para devolver a resposta ao Pod certo
-- Conexao parada por muito tempo perde a entrada na tabela (usar keep-alive ou connection pool)
-- Precisa haver rede entre cluster e banco: mesma VNet, VNet peering, ou Private Endpoint
-- Private Endpoint: o banco ganha IP privado na VNet; o nome precisa resolver
-  para o IP privado (zona de DNS privada)
-- Diagnostico: timeout = algo bloqueando (firewall, NetworkPolicy, IP nao liberado);
-  connection refused = chegou, mas nada escutava; nome nao resolve = DNS
+## Deployment, labels e Service
 
-## Producao x laboratorio
-- Producao: o IP publico vem do load balancer da nuvem (LoadBalancer no AKS)
-- Minikube: o "minikube tunnel" faz o papel do load balancer. So existe no laboratorio
+### Deployment
 
+- Um Pod sozinho é frágil: se morre, nada sobe outro no lugar.
+- O Deployment garante um número fixo de réplicas; se um Pod morre, outro é criado.
+- `kubectl scale` define o número **final** desejado (não "adiciona").
+- Nomes de Pods são gerados: `<deployment>-<hash-replicaset>-<sufixo-aleatório>`.
+- O Deployment controla o **número** de Pods (via ReplicaSet); o kubelet controla a **saúde** do container.
 
-# Fase 7 - Kubernetes - Modulo 3 (Configuracao e saude) - Conceitos
+### Labels e selector
+
+- Label é um par `chave=valor` (ex.: `app=meu-app`).
+- O Deployment aplica a label em cada Pod que cria.
+- O Service **não** gerencia Pods: guarda só uma regra (*selector*) e roteia para os Pods que combinam com ela.
+- `kubectl expose` copia o selector do Deployment automaticamente; em YAML, ele é escrito manualmente.
+- Os nomes do Deployment, dos Pods e do Service são independentes: **o que liga tudo é a label**.
+
+### Service e portas
+
+- O IP de um Pod muda quando ele é recriado; o IP do Service (ClusterIP) é fixo.
+- `port`: porta em que o Service recebe conexões. `targetPort`: porta dos Pods (se omitida, copia `port`).
+- Quem decide a porta em que o Pod escuta é a aplicação dentro da imagem; o Service só direciona tráfego.
+- Um Service pode ter várias portas (cada uma com `name`, `port`, `targetPort`), útil para HTTP + métricas.
+
+### `kubectl port-forward` (ferramenta de teste)
+
+- Cria um túnel entre uma porta local e **um** Pod do cluster.
+- Usa o Service só para escolher o Pod; depois vai direto nele (sem o balanceamento real).
+- Caminho: navegador → Windows → WSL → kubectl → kube-apiserver → kubelet do node → Pod.
+- O túnel só existe enquanto o comando está rodando.
+
+### Imperativo x declarativo
+
+- **Imperativo** (`create`, `expose`, `scale`, `set image`): "faça esta ação agora".
+- **Declarativo** (YAML + `kubectl apply -f`): "este é o estado desejado". Pode ser aplicado várias vezes; só muda o que for diferente.
+- **Em produção:** YAML versionado no Git e aplicado por pipeline de CI/CD.
+
+### Rolling update e rollback
+
+- `kubectl set image` troca a imagem gradualmente: sobe 1 Pod novo, espera ficar saudável e só então remove 1 antigo. Em nenhum momento todos ficam fora do ar.
+- `kubectl rollout undo` volta à versão anterior com o mesmo mecanismo gradual; ReplicaSets antigos ficam com 0 réplicas justamente para isso.
+- **Atenção:** se o Deployment foi criado via `apply`, o `undo` não altera a "última configuração aplicada" — um próximo `apply` sobrescreve o rollback com o que estiver no YAML.
+
+---
+
+## Rede e Ingress
+
+### DNS interno
+
+- O CoreDNS resolve o nome do Service para o seu IP fixo; o kube-proxy distribui entre os Pods vivos com a label certa.
+- Mesmo namespace: nome curto (`svc-banco`). Outro namespace: `svc-banco.dados`. Nome completo: `svc-banco.dados.svc.cluster.local`.
+- Sempre apontar para o **nome do Service**, nunca para IP de Pod.
+
+### Ingress
+
+- O objeto Ingress só guarda **regras** (host/caminho → Service); não executa nada.
+- O **Ingress Controller** (um Pod com nginx) é quem executa as regras. Sem controller, nada funciona.
+- `ingressClassName` define qual controller lê aquela regra.
+- Service atua na camada 4 (IP e porta); Ingress na camada 7 (host e caminho).
+- Cadeia completa: DNS → IP do load balancer → node → controller → Service → Pod. O Control Plane guarda as regras, mas fica **fora** do caminho do tráfego.
+- O controller é um Pod comum: o scheduler escolhe o node (pode ser forçado com nodeSelector, affinity ou taints). **Em produção:** 2 ou mais réplicas em nodes diferentes.
+- O Ingress cuida só da porta de entrada; URLs internas (ex.: `/pisos/carvalho`) são da aplicação.
+- `pathType: Prefix` vale para o caminho e tudo que começa com ele; a regra mais específica vence.
+- **503** quase sempre = Service sem Pod pronto (label errada ou Pod não pronto). **404** = caminho sem regra, ou a aplicação não conhece o caminho.
+- O ingress-nginx foi anunciado como aposentado (manutenção até março/2026); o sucessor oficial é o **Gateway API**.
+
+### Saída do Pod para a rede externa (ex.: banco na nuvem)
+
+- Caminho: Pod → node → rede da nuvem (VNet) → destino.
+- O node faz **NAT**: troca o IP de origem pelo dele e registra a conexão numa tabela, usada para devolver a resposta ao Pod certo.
+- Conexão ociosa por muito tempo perde a entrada na tabela → usar keep-alive ou connection pool.
+- Precisa haver rede entre cluster e banco: mesma VNet, VNet peering ou Private Endpoint.
+- Private Endpoint: o banco ganha IP privado na VNet; o nome precisa resolver para esse IP (zona de DNS privada).
+
+**Diagnóstico de conectividade**
+
+| Sintoma | Causa provável |
+|---|---|
+| Timeout | Algo bloqueando (firewall, NetworkPolicy, IP não liberado) |
+| Connection refused | Chegou ao destino, mas nada escutava na porta |
+| Nome não resolve | DNS |
+
+### Produção x laboratório
+
+- **Produção:** o IP público vem do load balancer da nuvem (Service `LoadBalancer` no AKS).
+- **Minikube:** `minikube tunnel` faz o papel do load balancer; só existe no laboratório.
+
+---
 
 ## ConfigMap e Secret
-- A imagem e imutavel e igual em todos os ambientes; so a configuracao muda e entra de fora
-- ConfigMap: configuracao comum (URL, nivel de log). Secret: dado sensivel (senha, token)
-- Secret NAO e cofre: e so base64 (kubectl get secret ... | base64 -d mostra a senha)
-- Protecao real: RBAC (quem pode ler secrets), criptografia em repouso, cofre externo (Azure Key Vault)
-- Secret com senha real nunca vai para o Git
-- O ConfigMap nao sabe quem o usa: o Deployment aponta para ele pelo NOME (envFrom)
-- ConfigMap e Secret so sao lidos por Pods do MESMO namespace
-- O nome da chave e um acordo entre o codigo e o ConfigMap/Secret
-  (no .NET, a variavel Db__Server sobrescreve Db:Server do appsettings)
-- Valor que vem de fora vence o do appsettings; o appsettings fica com os valores padrao
 
-## Entrega por variavel de ambiente x arquivo
-- Variavel: o Pod recebe uma COPIA quando nasce. Mudar o ConfigMap nao muda Pods
-  que ja estao rodando -> precisa de rollout restart
-- Arquivo montado (volume): atualiza sozinho em cerca de 1 minuto, mas o app precisa reler
-  (com subPath nao atualiza)
-- Arquivo e preferido para certificados e segredos sensiveis (menos exposicao em logs)
-- Volume em dois blocos: volumes (DE ONDE vem) e volumeMounts (ONDE aparece no container),
-  ligados pelo campo name, que e so um rotulo
-- Volume de Secret/ConfigMap nao persiste dados: e so uma janela para o objeto no cluster
+- A imagem é imutável e igual em todos os ambientes; só a configuração muda e entra de fora.
+- **ConfigMap:** configuração comum (URL, nível de log). **Secret:** dado sensível (senha, token).
+- **Secret não é cofre:** é só base64 (`kubectl get secret ... | base64 -d` revela o valor).
+- Proteção real: RBAC (quem pode ler secrets), criptografia em repouso e cofre externo (Azure Key Vault). Secret com valor real **nunca** vai para o Git.
+- O ConfigMap não sabe quem o usa: o Deployment o referencia pelo **nome** (`envFrom`).
+- ConfigMap e Secret só são lidos por Pods do **mesmo namespace**.
+- O nome da chave é um contrato entre o código e o ConfigMap/Secret. No .NET, a variável `Db__Server` sobrescreve `Db:Server` do `appsettings`; o valor externo vence, e o `appsettings` fica com os padrões.
 
-## Namespace
-- Pasta de organizacao dentro do cluster, guardada no Control Plane. Nao e um lugar fisico
-- Um Node pode ter Pods de varios namespaces, e um namespace pode ter Pods em todos os Nodes
-- Permite repetir nomes em pastas diferentes e aplicar permissoes e limites por pasta
-- NAO isola a rede sozinho: para isso e preciso NetworkPolicy
+### Variável de ambiente x arquivo montado
 
-## Probes (testes de saude, executadas pelo kubelet)
-- Readiness: o Pod esta pronto para receber trafego? Falhou -> sai da lista do Service,
-  sem reiniciar. Resolve o app ainda ligando ou que perdeu o banco
-- Liveness: o app esta vivo? Falhou -> o kubelet reinicia o CONTAINER (RESTARTS sobe),
-  o Pod continua o mesmo
-- Tres tipos de teste: exec (comando), httpGet (endereco como /health), tcpSocket (porta)
-- Liveness deve testar so o proprio app, nunca dependencias como o banco
-  (senao o Kubernetes reinicia tudo sem resolver nada)
-- Deployment cuida do NUMERO de Pods (via ReplicaSet); o kubelet cuida da saude do container
+| | Variável de ambiente | Arquivo (volume) |
+|---|---|---|
+| Atualização | O Pod recebe uma **cópia** ao nascer; mudança exige `rollout restart` | Atualiza sozinho em ~1 minuto (a aplicação precisa reler); com `subPath` não atualiza |
+| Uso recomendado | Configuração simples | Certificados e segredos sensíveis (menos exposição em logs) |
 
-## Pod x container x Deployment
-- Pod e a casa, container e o morador. Quase sempre 1 container por Pod
-- Pod e descartavel: o Kubernetes nao conserta, troca por outro
-- O que mata o container: erro no app, OOMKilled (falta de memoria), liveness
-- O que mata o Pod: delete, Node cai, eviction, rolling update, escalar para baixo
-- Comando que MUDA o Deployment (rollout restart, scale) age em todos os Pods
-- exec e logs com deploy/nome escolhem UM Pod, sem voce controlar qual;
-  para um Pod especifico, usar o nome exato dele
+- Um volume tem duas partes: `volumes` (**de onde** vem) e `volumeMounts` (**onde** aparece no container), ligadas pelo campo `name`.
+- Volume de Secret/ConfigMap não persiste dados: é uma janela para o objeto no cluster.
 
-# ===== HPA (Horizontal Pod Autoscaler) =====
+---
 
-ANALOGIA: supermercado
-- Gerente (HPA): decide quantos caixas (pods) ficam abertos
-- Prancheta (metrics-server): mede o esforço real (CPU) de cada caixa e informa o HPA
-- Organizador da fila (Service): distribui as requisições entre os pods prontos
-- Arrumador (Scheduler): decide em qual node cada pod roda, olhando o requests
-- Construtor (Cluster Autoscaler): cria/remove nodes quando há pods Pending (no AKS, opção do node pool)
-- Fantasmas (pods placeholder / overprovisioning): guardam vaga; expulsos no pico, avisam o Cluster Autoscaler mais cedo
+## Probes
 
-RECURSOS DE CADA POD (no Deployment)
-- requests (reserva): força GARANTIDA. Base do cálculo do HPA e do Scheduler. Sem ele → HPA <unknown>
-- limits (teto): máximo que o pod pode usar emprestando força ociosa do node. CPU no teto → fica lento (throttling)
-- Empréstimo: só da força ociosa; quando o dono da reserva precisa, recebe na hora (o Linux reajusta sozinho)
-- Pegadinha: sem requests mas com limits → o Kubernetes copia o limits para o requests
-- Memória: não dá para devolver aos poucos → falta = OOMKilled. Prática: limits de memória = requests
-- Sem requests e sem limits → pod BestEffort (primeiro a ser expulso)
-- No teto de CPU o pod não recusa requisições: fica lento. A fila fica no próprio pod (memória), não no Service
+Testes de saúde executados pelo **kubelet**.
 
-REGRAS DO HPA
-- Meta (averageUtilization): % da reserva em que cada pod deve trabalhar (ex.: 50%). É META, não gatilho
-- minReplicas / maxReplicas: mínimo e máximo de pods (mínimo 2 = alta disponibilidade)
-- Decide pela MÉDIA dos pods → um pod sobrecarregado pode se esconder na média
-- Sobe rápido; desce devagar (stabilizationWindowSeconds = 300 / 5 min) → evita flapping
-- Padrão de subida: a cada 15s, dobra ou soma 4 pods (o maior) → por isso 2 → 6
-- Metrics-server fora do ar → HPA congela no último número (não sobe nem desce)
-- Com HPA, REMOVER o campo replicas do Deployment (senão o apply/pipeline briga com o HPA)
-- HPA olha CPU (esforço), não quantidade de requisições. Requisições/s = métricas customizadas (Prometheus, KEDA)
+| Probe | Pergunta | Se falhar |
+|---|---|---|
+| **Readiness** | O Pod está pronto para receber tráfego? | Sai da lista do Service, **sem** reiniciar (cobre app ainda iniciando ou sem acesso ao banco) |
+| **Liveness** | A aplicação está viva? | O kubelet reinicia o **container** (`RESTARTS` sobe); o Pod continua o mesmo |
 
-CAMADAS DE ESCALA
-- HPA: mais pods · VPA: pods maiores · Cluster Autoscaler: mais nodes
-- Pod sobe em segundos; node (VM) em minutos
-- Economia real na nuvem: paga-se por VM (node), não por pod → só economiza quando o node é desligado
+- Tipos de teste: `exec` (comando), `httpGet` (ex.: `/health`) e `tcpSocket` (porta).
+- **Em produção:** a liveness deve testar só a própria aplicação, nunca dependências como o banco — senão o Kubernetes reinicia tudo sem resolver nada.
 
-DEBUG
-- describe hpa: Metrics (esforço), Conditions (ScalingActive = enxerga? AbleToScale = pode agir?), Events (decisões e erros)
-- HPA <unknown>: 1) metrics-server fora; 2) falta requests de CPU ("missing request for cpu")
-- Events x logs: Events = o que o Kubernetes registra sobre o objeto (temporários). Logs = o que a aplicação escreve
-- Pod não chega a rodar → describe (Events). Pod roda e falha → logs
-- ReplicaSet: DESIRED (deveria ter) / CURRENT (existe) / READY (pronto). READY menor = pod com problema
+---
 
-YAML
-- name = identidade única (CPF) · labels = etiqueta de grupo (camiseta) · selector = busca pela etiqueta
-- Filtro -l só encontra objetos que TÊM a label no próprio metadata (selector não conta)
-- Chaves fixas do Kubernetes (name, labels, image...) x chaves inventadas (dentro de labels/selector)
-- Irmãos na mesma coluna · só espaços, nunca Tab · hífen = item de lista
-- apply -f constrói, delete -f desmonta: o arquivo é a planta (infraestrutura como código)
-- Rolling update: troca gradual dos pods sem derrubar o sistema; ReplicaSets antigos ficam com 0 para rollback
+## HPA (Horizontal Pod Autoscaler)
 
-=== VOLUMES PERSISTENTES ===
+Analogia do supermercado:
 
-PROBLEMA
-- Disco de dentro do container morre junto com o pod.
-- Banco de dados e arquivos importantes precisam de disco fora do pod.
+| Papel | Componente |
+|---|---|
+| Gerente: decide quantos caixas abertos | HPA |
+| Prancheta: mede o esforço real de cada caixa | metrics-server |
+| Organizador da fila: distribui clientes entre caixas prontos | Service |
+| Arrumador: decide em que sala cada caixa fica, olhando a reserva | Scheduler |
+| Construtor: cria/remove salas quando há caixas sem lugar (`Pending`) | Cluster Autoscaler (no AKS, opção do node pool) |
+| Fantasmas: guardam vaga e são expulsos no pico, acionando o construtor mais cedo | Pods placeholder (overprovisioning) |
 
-AS PEÇAS
-- PV (PersistentVolume): o disco real registrado no cluster. Criado
-  automaticamente. Tem ID único, tamanho, modo de acesso e política.
-- PVC (PersistentVolumeClaim): o PEDIDO de disco. É o que o dev escreve
-  (tamanho, tipo, modo de acesso). Tem nome fixo escolhido por mim.
-- StorageClass: define o tipo de disco entregue e quem o cria
-  (provisionamento dinâmico).
-- Driver CSI: programa no cluster que fala com a nuvem (Azure) e cria o disco.
+### Recursos de cada Pod
 
-FLUXO
-1. Escrevo o PVC  2. CSI pede o disco à nuvem  3. Nuvem cria o disco
-4. Kubernetes cria o PV  5. PVC liga ao PV (Bound)  6. Pod usa o PVC pelo nome
+- **requests (reserva):** força garantida; base do cálculo do HPA e do Scheduler. Sem requests de CPU → HPA mostra `<unknown>`.
+- **limits (teto):** máximo que o Pod pode usar, emprestando capacidade ociosa do node. CPU no teto → *throttling* (fica lento).
+- O empréstimo vem só da capacidade ociosa; quando o dono da reserva precisa, recebe na hora (o kernel reajusta).
+- **Pegadinha:** sem requests mas com limits, o Kubernetes copia limits para requests.
+- Memória não pode ser devolvida aos poucos → falta = **OOMKilled**. Prática: limits de memória = requests.
+- Sem requests e sem limits → Pod **BestEffort**, o primeiro a ser expulso.
+- No teto de CPU o Pod não recusa requisições: fica lento, e a fila fica no próprio Pod (memória), não no Service.
 
-REGRAS
-- O pod aponta para o PVC, nunca para o PV. O mesmo YAML roda em qualquer
-  cluster (teste, homologação, produção), cada um com o seu disco.
-- 1 PVC = 1 PV. Cada pedido cria um disco próprio.
-- PVC: tamanho só aumenta (se a StorageClass permitir). Nome, StorageClass
-  e modo de acesso não mudam. Trocar o nome = disco novo e vazio.
-- PV é do cluster. PVC é do namespace.
-- Modos de acesso: ReadWriteOnce (1 node), ReadWriteMany (vários nodes),
-  ReadOnlyMany. Azure Disk = RWO.
-- reclaimPolicy: Delete apaga o disco junto com o PVC. Retain mantém.
-  Em produção com dado importante, usar Retain.
-- O PVC não libera enquanto um pod o usa: fica Terminating.
+### Regras do HPA
 
-BACKUP
-- Disco persistente NÃO é backup.
-- Snapshot (VolumeSnapshot) = foto do disco. Restaura criando PVC novo.
-- Banco: backup lógico (dump) guardado fora do disco.
-- Azure Backup para AKS e Velero automatizam.
-- Responsabilidade compartilhada: a nuvem dá a ferramenta, eu ligo, agendo
-  e testo a restauração.
+- `averageUtilization`: % da reserva em que cada Pod deve trabalhar (ex.: 50%). É **meta**, não gatilho.
+- `minReplicas` / `maxReplicas`: mínimo 2 garante alta disponibilidade; o máximo protege custo e cluster.
+- Decide pela **média** dos Pods → um Pod sobrecarregado pode se esconder na média.
+- Sobe rápido e desce devagar (`stabilizationWindowSeconds: 300`) → evita *flapping*.
+- Padrão de subida: a cada 15 s, dobra ou soma 4 Pods (o que for maior) → por isso 2 → 6.
+- metrics-server fora do ar → o HPA congela no último número.
+- **Com HPA, remover `replicas` do Deployment** — senão cada `apply`/pipeline briga com o HPA.
+- O HPA olha CPU (esforço), não volume de requisições. Requisições/s exigem métricas customizadas (Prometheus, KEDA).
 
-STATEFULSET (conceito)
-- Deployment: pods intercambiáveis. StatefulSet: pods com nome fixo
-  (banco-0, banco-1), subida em ordem e disco próprio para cada um.
+### Camadas de escala
 
-PRODUÇÃO
-- Banco em produção costuma ser gerenciado (Azure SQL, PostgreSQL Flexible).
-- Secret/ConfigMap em volume entregam config ao pod (temporário).
-  PVC guarda dado da aplicação (permanece).
+- **HPA:** mais Pods · **VPA:** Pods maiores · **Cluster Autoscaler:** mais nodes.
+- Pod sobe em segundos; node (VM) em minutos.
+- **Custo:** na nuvem paga-se por VM (node), não por Pod → só há economia quando um node é desligado.
 
-=== AKS (Azure Kubernetes Service) ===
+### Debug
 
-- Serviço gerenciado da Azure para criar e operar um cluster Kubernetes completo.
-  É o Kubernetes de verdade (mesmo kubectl e YAMLs).
-- Azure cuida: Control Plane (apiserver, etcd, scheduler), redundância, falhas, certificados
-  e manutenção dele. Eu não vejo nem acesso essas máquinas, só converso com a API pelo kubectl.
-  Publica também imagem nova de node (SO) toda semana.
-- Eu cuido: nodes (tamanho, quantidade, node pools, custo), atualização de versão, rede (VNet,
-  Private Endpoint, firewall), segurança (RBAC, Entra ID, Secrets), backup, monitoramento e
-  aplicações (réplicas suficientes, probes, HPA).
-- O AKS provisiona os nodes (VMs na minha conta), mas a responsabilidade por eles é minha.
-- Sem AKS (self-managed): eu monto e mantenho o Control Plane (3 servidores para alta
-  disponibilidade), o etcd e o backup dele, os certificados e as atualizações.
-- Modelo de responsabilidade compartilhada: a nuvem cuida do cérebro, eu cuido do resto.
-- Não é SaaS: é serviço gerenciado (mais perto de PaaS). SaaS = software pronto; IaaS = só a VM.
+- `describe hpa`: **Metrics** (esforço), **Conditions** (`ScalingActive` = enxerga a métrica? `AbleToScale` = pode agir?) e **Events** (decisões e erros).
+- HPA `<unknown>`: (1) metrics-server fora; (2) falta requests de CPU (`missing request for cpu`).
+- **Events x logs:** Events são o que o Kubernetes registra sobre o objeto (temporários); logs são o que a aplicação escreve. Pod não chega a rodar → `describe`; Pod roda e falha → `logs`.
+- ReplicaSet: `DESIRED` (deveria ter) / `CURRENT` (existe) / `READY` (pronto). READY menor = Pod com problema.
 
-ATUALIZAÇÕES
-- Por padrão NADA atualiza sozinho (canal none): o cluster fica na versão em que foi criado.
-- Cada versão do Kubernetes tem cerca de 12 meses de suporte; depois fica sem suporte.
-- Control Plane e nodes precisam ficar em versões próximas; o AKS atualiza o Control Plane e depois os nodes.
-- Atualizar: manual (CLI, portal ou IaC) ou por canal automático (patch, stable, rapid), com janela de manutenção.
-- Imagem do node (SO) é outro tipo de atualização: sai toda semana, mas nodes já rodando só
-  recebem se eu aplicar (ou ligar o canal NodeImage).
-- Atualizar nodes recria as VMs: a aplicação precisa de 2 ou mais réplicas e probes.
+---
+
+## Volumes persistentes
+
+O disco interno do container morre com o Pod. Banco de dados e arquivos importantes precisam de disco **fora** do Pod.
+
+### Peças
+
+| Peça | Papel |
+|---|---|
+| **PV** (PersistentVolume) | O disco real registrado no cluster, criado automaticamente; tem ID, tamanho, modo de acesso e política |
+| **PVC** (PersistentVolumeClaim) | O **pedido** de disco (tamanho, tipo, modo de acesso), com nome fixo; é o que a aplicação referencia |
+| **StorageClass** | Define o tipo de disco e quem o cria (provisionamento dinâmico) |
+| **Driver CSI** | Componente que fala com a nuvem (Azure) e cria o disco |
+
+Fluxo: escrever o PVC → o CSI pede o disco à nuvem → a nuvem cria o disco → o Kubernetes cria o PV → o PVC fica `Bound` → o Pod usa o PVC pelo nome.
+
+### Regras
+
+- O Pod aponta para o **PVC**, nunca para o PV: o mesmo YAML roda em qualquer cluster (teste, homologação, produção), cada um com seu disco.
+- 1 PVC = 1 PV.
+- Tamanho do PVC só aumenta (se a StorageClass permitir). Nome, StorageClass e modo de acesso não mudam; trocar o nome = disco novo e vazio.
+- PV é do cluster; PVC é do namespace.
+- Modos de acesso: `ReadWriteOnce` (1 node), `ReadWriteMany` (vários nodes), `ReadOnlyMany`. Azure Disk = RWO.
+- `reclaimPolicy: Delete` apaga o disco junto com o PVC; `Retain` mantém. **Em produção, com dado importante: Retain.**
+- O PVC não é liberado enquanto um Pod o usa (fica `Terminating`).
+
+### Backup
+
+- **Disco persistente não é backup.**
+- Snapshot (`VolumeSnapshot`) = foto do disco; a restauração cria um PVC novo.
+- Banco de dados: backup lógico (dump) guardado fora do disco.
+- Azure Backup para AKS e Velero automatizam o processo.
+- Responsabilidade compartilhada: a nuvem fornece a ferramenta; o time liga, agenda e **testa a restauração**.
+
+### StatefulSet
+
+- Deployment: Pods intercambiáveis.
+- StatefulSet: Pods com nome fixo (`banco-0`, `banco-1`), subida em ordem e disco próprio para cada um.
+
+### Em produção
+
+- Banco de dados costuma ser gerenciado (Azure SQL, PostgreSQL Flexible Server).
+- Secret/ConfigMap em volume entregam configuração (temporário); o PVC guarda dado da aplicação (permanente).
+
+---
+
+## Namespaces e RBAC
+
+### Namespace
+
+- Pasta lógica de organização dentro do cluster, guardada no Control Plane; não é um lugar físico.
+- Um node pode ter Pods de vários namespaces, e um namespace pode ter Pods em todos os nodes.
+- Permite repetir nomes em pastas diferentes e aplicar permissões e limites por pasta.
+- **Não isola a rede sozinho:** para isso é preciso NetworkPolicy.
+
+### Identidade
+
+- O Kubernetes não tem cadastro de usuários: ele só confere um documento (token ou certificado).
+- O **kubeconfig** (`clusters`, `users`, `contexts`) diz para onde ir e como obter o token; `certificate-authority-data` permite validar o apiserver.
+- Com login central (OIDC), o provedor valida a senha e emite o token; o apiserver confere assinatura, `aud` e validade.
+
+### RBAC
+
+- **Role:** o que pode ser feito, dentro de um namespace.
+- **RoleBinding:** quem recebe a Role (usuário ou grupo vindo do token).
+- RBAC só **libera**: o que não está escrito é proibido. `resourceNames` limita a permissão a objetos específicos.
+- `Forbidden` pode ser sintoma de referência errada (nome de Role, grupo ou namespace).
+- **Em produção:** menor privilégio, atenção especial a quem pode ler `secrets` e apagar PVCs.
+
+---
+
+## AKS (Azure Kubernetes Service)
+
+- Serviço gerenciado da Azure para criar e operar clusters Kubernetes. É o Kubernetes padrão: mesmo kubectl e mesmos YAMLs usados no minikube.
+- Mercado prefere Kubernetes gerenciado (AKS/EKS/GKE) a self-managed, exceto em cenários on-premises ou com time de infraestrutura dedicado.
+
+### Responsabilidade compartilhada
+
+| Azure cuida | O cliente cuida |
+|---|---|
+| Control Plane (apiserver, etcd, scheduler), redundância, falhas, certificados e manutenção; publica imagem nova de node (SO) toda semana | Nodes (tamanho, quantidade, node pools, custo), atualização de versão, rede (VNet, Private Endpoint, firewall), segurança (RBAC, Entra ID, Secrets), backup, monitoramento e aplicações (réplicas, probes, HPA) |
+
+- O AKS provisiona os nodes (VMs na assinatura do cliente), mas a responsabilidade sobre eles é do cliente.
+- Sem AKS (self-managed), o time monta e mantém o Control Plane (3 servidores para alta disponibilidade), o etcd e seu backup, certificados e atualizações.
+- Não é SaaS: é serviço gerenciado, mais próximo de PaaS. SaaS = software pronto; IaaS = só a VM.
+
+### Atualizações
+
+- Por padrão **nada** atualiza sozinho (canal `none`): o cluster fica na versão em que foi criado.
+- Cada versão do Kubernetes tem cerca de 12 meses de suporte.
+- Control Plane e nodes precisam ficar em versões próximas; o AKS atualiza primeiro o Control Plane, depois os nodes.
+- Atualizar: manual (CLI, portal ou IaC) ou por canal automático (`patch`, `stable`, `rapid`), com janela de manutenção.
+- A imagem do node (SO) é outra atualização: sai toda semana, mas nodes em execução só a recebem se aplicada (ou com o canal `NodeImage`).
+- Atualizar nodes recria as VMs → a aplicação precisa de 2+ réplicas e probes.
 - Testar a atualização em cluster de teste antes de produção.
 
-VARIAÇÕES E ALTERNATIVAS NA AZURE
-- AKS Standard: o que estudei; mais controle, mais trabalho operacional.
-- AKS Automatic: a Azure assume mais (nodes, escala), com boas práticas já ligadas.
-- Fleet Manager: administra vários clusters juntos (ex.: atualizações coordenadas).
-- Container Apps: roda containers sem eu operar Kubernetes (escala automática).
-- ACI: um container isolado ou tarefa pontual, sem orquestração.
-- Quanto mais a Azure cuida, menos trabalho e menos controle eu tenho.
-- ACR (Container Registry) guarda as imagens; o AKS puxa as imagens de lá.
+### Variações e alternativas na Azure
 
-INTEGRAÇÕES E CUSTO
-- Prontas: Entra ID + RBAC, driver CSI de Azure Disk/Files (StorageClass), type LoadBalancer
-  com IP público real, Cluster Autoscaler (opção do node pool), ACR e Key Vault.
-- Control Plane com nível Free (sem SLA, não é para produção); paga-se as VMs dos nodes e os discos.
-- Conta de estudante: crédito limitado; ao acabar a assinatura é desativada. Pode haver
-  restrição de região, tamanho de VM e cota de vCPUs na criação do cluster.
-- Cuidados na prática: grupo de recursos só para o teste, 1 node pequeno, alerta de orçamento
-  e apagar o grupo de recursos no fim.
-- Mercado prefere Kubernetes gerenciado (AKS/EKS/GKE) a self-managed.
+| Opção | Quando usar |
+|---|---|
+| AKS Standard | Mais controle, mais trabalho operacional (modelo dos labs) |
+| AKS Automatic | A Azure assume mais (nodes, escala), com boas práticas já ligadas |
+| Fleet Manager | Administrar vários clusters juntos (ex.: atualizações coordenadas) |
+| Container Apps | Rodar containers com escala automática sem operar Kubernetes |
+| ACI | Um container isolado ou tarefa pontual, sem orquestração |
+
+- Quanto mais a Azure gerencia, menos trabalho e menos controle.
+- O **ACR** (Azure Container Registry) guarda as imagens; o AKS as puxa de lá.
+
+### Integrações e custo
+
+- Integrações prontas: Entra ID + RBAC, driver CSI de Azure Disk/Files (StorageClass), Service `LoadBalancer` com IP público, Cluster Autoscaler (opção do node pool), ACR e Key Vault.
+- Control Plane no nível Free (sem SLA, não indicado para produção); paga-se pelas VMs dos nodes e pelos discos.
+- Contas de teste/estudante têm crédito limitado e podem ter restrição de região, tamanho de VM e cota de vCPUs.
+- Cuidados em lab: grupo de recursos exclusivo, 1 node pequeno, alerta de orçamento e remoção do grupo de recursos no fim.
+
+---
+
+## Boas práticas de YAML
+
+- `name` = identidade única (como um CPF) · `labels` = etiqueta de grupo (como uma camiseta) · `selector` = busca pela etiqueta.
+- O filtro `-l` só encontra objetos que **têm** a label no próprio `metadata` (o selector não conta).
+- Chaves fixas do Kubernetes (`name`, `labels`, `image`...) x chaves livres (valores dentro de `labels`/`selector`).
+- Itens irmãos na mesma coluna · só espaços, nunca Tab · hífen = item de lista.
+- `apply -f` constrói, `delete -f` desmonta: o arquivo é a planta da infraestrutura (infraestrutura como código).

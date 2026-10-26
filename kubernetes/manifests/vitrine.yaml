@@ -18,6 +18,6 @@ spec:
         command: ["sleep", "3600"]  # fica parado por 1 hora, sem fazer nada
         envFrom:                    # "entregue variáveis de ambiente vindas de..."
         - configMapRef:             # ...um ConfigMap
-            name: config-app        # o nome do ConfigMap que criamos
+            name: config-app        # ConfigMap criado em config-teste.yaml
         - secretRef:                # ...e também um Secret
-            name: segredo-app       # o nome do Secret que criamos
+            name: segredo-app       # Secret criado em config-teste.yaml
