@@ -1,7 +1,7 @@
 # CI/CD com GitHub Actions — Projeto Agendamento
 
-[![Testes](https://github.com/diogodiasit/estudos-devops/actions/workflows/agendamento.yml/badge.svg)](https://github.com/diogodiasit/estudos-devops/actions/workflows/agendamento.yml)
-[![Deploy](https://github.com/diogodiasit/estudos-devops/actions/workflows/deploy-agendamento.yml/badge.svg)](https://github.com/diogodiasit/estudos-devops/actions/workflows/deploy-agendamento.yml)
+[![Testes](https://github.com/diogodiasit/devops-sre-labs/actions/workflows/agendamento.yml/badge.svg)](https://github.com/diogodiasit/devops-sre-labs/actions/workflows/agendamento.yml)
+[![Deploy](https://github.com/diogodiasit/devops-sre-labs/actions/workflows/deploy-agendamento.yml/badge.svg)](https://github.com/diogodiasit/devops-sre-labs/actions/workflows/deploy-agendamento.yml)
 
 Pipeline completo de integração e entrega contínuas para uma aplicação Python containerizada: testes automáticos em cada Pull Request, proteção da branch principal e publicação automática da imagem no Docker Hub após o merge.
 
