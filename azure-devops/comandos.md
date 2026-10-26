@@ -14,7 +14,7 @@ git clone https://dev.azure.com/<organizacao>/<projeto>/_git/<repositorio> <past
 ## Copiar o projeto existente para o novo repositório
 
 ```bash
-cp -r ~/estudos-devops-sre/projeto-agendamento ~/<pasta-local>/
+cp -r ~/devops-sre-labs/cicd/projeto-agendamento ~/<pasta-local>/
 ```
 
 - `cp -r`: copia a pasta inteira (`-r` = recursivo).
