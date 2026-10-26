@@ -21,10 +21,10 @@ jobs:
 
       - name: Buildar a imagem
         run: |
-          cd projeto-agendamento/app
+          cd cicd/projeto-agendamento/app
           docker build -t agendamento-barbearia .
 
       - name: Rodar os testes dentro do container
         run: |
-          cd projeto-agendamento/app
+          cd cicd/projeto-agendamento/app
           docker run agendamento-barbearia
