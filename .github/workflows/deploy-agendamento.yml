@@ -29,7 +29,7 @@ jobs:
       # porque é assim que o Docker Hub sabe em qual "gaveta" (repositório) publicar
       - name: Buildar a imagem
         run: |
-          cd projeto-agendamento/app
+          cd cicd/projeto-agendamento/app
           docker build -t diogojdiasit/agendamento-barbearia:latest .
 
       # Passo 4: publicar (enviar) a imagem pro Docker Hub
