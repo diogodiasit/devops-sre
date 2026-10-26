@@ -10,3 +10,17 @@ Thumbs.db
 # Configuração pessoal de editor
 .vscode/
 .idea/
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
